@@ -1,0 +1,219 @@
+version: 3
+
+includes:
+  build:bin:
+    taskfile: tasks_build_bin.yaml
+    internal: true
+
+tasks:
+  # This is a dummy task that serves as a separator between task namespaces in the 'task -l' output.
+  "---":
+    desc: "{{.BLD_IMG_SEP}}"
+    cmds:
+    - cmd: echo "{{.SEP_MSG}}"
+      silent: true
+
+  prepare-docker-builder:
+    desc: "  Prepares the docker multiarch builder."
+    run: once
+    requires:
+      vars:
+      - DOCKER_BUILDER_NAME
+    status:
+    - 'docker buildx ls | grep "{{.DOCKER_BUILDER_NAME}}" >/dev/null'
+    cmds:
+    - '( docker buildx ls | grep "{{.DOCKER_BUILDER_NAME}}" >/dev/null ) || docker buildx create --name {{.DOCKER_BUILDER_NAME}} >/dev/null' # duplicate the check because this might throw an error if run with '-f' otherwise
+    internal: true
+
+  build:
+    desc: "  Build the image for $OS/$ARCH."
+    summary: |
+      This task builds the image for the current operating system and architecture.
+      To overwrite this, set the 'OS' and 'ARCH' environment variables.
+      To overwrite the image's base path, set the 'IMAGE_REGISTRY' environment variable.
+    deps:
+    - task: build:bin:build
+      vars:
+        OS: '{{.OS}}'
+        ARCH: '{{.ARCH}}'
+    cmds:
+    - task: build-raw
+      vars:
+        OS: '{{.OS}}'
+        ARCH: '{{.ARCH}}'
+
+  build-raw:
+    desc: "  Build the image. Does not run the binary build before."
+    summary: |
+      This task builds the image for the current operating system and architecture.
+      To overwrite this, set the 'OS' and 'ARCH' environment variables.
+      To overwrite the image's base path, set the 'IMAGE_REGISTRY' environment variable.
+    requires:
+      vars:
+      - COMPONENTS
+      - VERSION
+      - OS
+      - ARCH
+    vars:
+      IMAGE_BASE:
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --image'
+    cmds:
+    - task: prepare-docker-builder
+    - for:
+        var: COMPONENTS
+      vars:
+        COMPONENT: '{{.ITEM}}'
+        IMAGE_BASE: '{{.IMAGE_BASE}}'
+        OS: '{{.OS}}'
+        ARCH: '{{.ARCH}}'
+      task: build-internal
+
+  build-internal:
+    desc: "  Build the image for a single component. Requires the docker builder to have been prepared before."
+    requires:
+      vars:
+      - COMPONENT
+      - VERSION
+      - OS
+      - ARCH
+      - IMAGE_BASE
+      - DOCKER_BUILDER_NAME
+    cmds:
+    - 'echo "Building image {{.COMPONENT}}:{{.VERSION}}-{{.OS}}-{{.ARCH}}"'
+    - '[[ "{{.OS}}" == "linux" ]] || { echo "The distroless base image does only support linux as operating system."; exit 1; }'
+    - 'cat "{{.TASKFILE_DIR2}}/Dockerfile" | sed "s/<component>/{{.COMPONENT}}/g" > "{{.ROOT_DIR2}}/Dockerfile.tmp"'
+    - '( cd "{{.ROOT_DIR2}}"; docker buildx build --builder {{.DOCKER_BUILDER_NAME}} --load --build-arg COMPONENT={{.COMPONENT}} --platform {{.OS}}/{{.ARCH}} -t {{.IMAGE_BASE}}/{{.COMPONENT}}:{{.VERSION}}-{{.OS}}-{{.ARCH}} -f Dockerfile.tmp . )'
+    - 'rm -f "{{.ROOT_DIR2}}/Dockerfile.tmp"'
+    internal: true
+
+  build-multi-raw:
+    desc: "  Build multi-platform image. Does not build the binaries before."
+    requires:
+      vars:
+      - COMPONENTS
+    cmds:
+    - for:
+        matrix:
+          OS: [linux] # distroless base image only supports linux
+          ARCH: [amd64, arm64]
+      vars:
+        OS: '{{.ITEM.OS}}'
+        ARCH: '{{.ITEM.ARCH}}'
+      task: build-raw
+
+  build-multi:
+    desc: "  Build multi-platform image."
+    requires:
+      vars:
+      - COMPONENTS
+    cmds:
+    - for:
+        matrix:
+          OS: [linux] # distroless base image only supports linux
+          ARCH: [amd64, arm64]
+      vars:
+        OS: '{{.ITEM.OS}}'
+        ARCH: '{{.ITEM.ARCH}}'
+      task: build
+
+  push:
+    desc: "  Push the image. Image must have been built before."
+    summary: |
+      This task pushes the image for the current operating system and architecture.
+      To overwrite this, set the 'OS' and 'ARCH' environment variables.
+      To overwrite the image's base path, set the 'IMAGE_REGISTRY' environment variable.
+    requires:
+      vars:
+      - COMPONENTS
+      - OS
+      - ARCH
+    cmds:
+    - for:
+        var: COMPONENTS
+      vars:
+        COMPONENT: '{{.ITEM}}'
+        OS: '{{.OS}}'
+        ARCH: '{{.ARCH}}'
+      task: push-internal
+
+  push-internal:
+    desc: "Push the image for a single component. Image must already have been built."
+    requires:
+      vars:
+      - COMPONENT
+      - VERSION
+      - OS
+      - ARCH
+    vars:
+      IMAGE_BASE:
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --image'
+    cmds:
+    - 'echo "Pushing image {{.COMPONENT}}:{{.VERSION}}-{{.OS}}-{{.ARCH}}"'
+    - 'docker push {{.IMAGE_BASE}}/{{.COMPONENT}}:{{.VERSION}}-{{.OS}}-{{.ARCH}}'
+    internal: true
+
+  push-multi:
+    desc: "  Push the multi-platform image. Images must have been built before."
+    vars:
+      IMAGE_BASE:
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --image'
+    requires:
+      vars:
+      - COMPONENTS
+      - VERSION
+    cmds:
+    - for:
+        matrix:
+          OS: [linux] # distroless base image only supports linux
+          ARCH: [amd64, arm64]
+      vars:
+        OS: '{{.ITEM.OS}}'
+        ARCH: '{{.ITEM.ARCH}}'
+      task: push
+    - for:
+        var: COMPONENTS
+        as: COMPONENT
+      vars:
+        IMG: '{{.IMAGE_BASE}}/{{.COMPONENT}}:{{.VERSION}}'
+      task: push-multi-internal
+
+  push-multi-internal:
+    desc: "  Build and push the multi-platform manifest for a single component's image. Individual platform-specific images must have been pushed before."
+    requires:
+      vars:
+      - IMG
+    cmds:
+    - for:
+        matrix:
+          OS: [linux] # distroless base image only supports linux
+          ARCH: [amd64, arm64]
+      cmd: 'docker manifest create {{.IMG}} --amend {{.IMG}}-{{.ITEM.OS}}-{{.ITEM.ARCH}}'
+    - 'echo "Pushing image {{.IMG}}"'
+    - 'docker manifest push {{.IMG}}'
+    internal: true
+
+  tag:
+    desc: "  Adds an additional tag to the multi-platform image. Image must have been built and pushed before."
+    preconditions:
+    - sh: '[[ "{{index (.CLI_ARGS | splitList " ") 0}}" != "" ]]'
+      msg: "No tag specified. Do so by calling 'task {{.TASK}} -- <tag>'."
+    vars:
+      IMAGE_BASE:
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --image'
+      TAG: '{{index (.CLI_ARGS | splitList " ") 0}}'
+    requires:
+      vars:
+      - COMPONENTS
+      - VERSION
+      - TAG
+    cmds:
+    - for:
+        var: COMPONENTS
+        as: COMPONENT
+      cmd: 'docker buildx imagetools create "{{.IMAGE_BASE}}/{{.COMPONENT}}:{{.VERSION}}" --tag "{{.IMAGE_BASE}}/{{.COMPONENT}}:{{.TAG}}"'
+
+  all:
+    desc: "  Build binaries and images for multiple operating systems and architectures and push them to the registry."
+    cmds:
+    - task: build-multi
+    - task: push-multi

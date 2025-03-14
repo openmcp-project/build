@@ -1,0 +1,88 @@
+version: 3
+
+includes:
+  gen:
+    taskfile: tasks_gen.yaml
+    internal: true
+  val:
+    taskfile: tasks_val.yaml
+    internal: true
+
+tasks:
+  # This is a dummy task that serves as a separator between task namespaces in the 'task -l' output.
+  "---":
+    desc: "{{.BLD_BIN_SEP}}"
+    cmds:
+    - cmd: echo "{{.SEP_MSG}}"
+      silent: true
+
+  build:
+    desc: '  Build the binary for $OS/$ARCH.'
+    summary: |
+      This task builds the binary for the current operating system and architecture.
+      To overwrite this, set the 'OS' and 'ARCH' environment variables.
+      The binary is saved in the 'bin' folder, as $COMPONENT.$OS-$ARCH.
+    requires:
+      vars:
+      - COMPONENTS
+      - OS
+      - ARCH
+    deps:
+    - gen:tidy
+    cmds:
+    - task: gen:generate # don't use deps, since they are executed in parallel
+    - task: val:validate # and we want the code generation
+    - task: val:test # to be executed before the validation.
+    - task: build-raw
+      vars:
+        OS: '{{.OS}}'
+        ARCH: '{{.ARCH}}'
+
+  build-raw:
+    desc: "  Build the binary. Opposed to the regular build, this one just builds and skips code generation/validation tasks."
+    summary: |
+      This task builds the binary for the current operating system and architecture.
+      To overwrite this, set the 'OS' and 'ARCH' environment variables.
+      The binary is saved in the 'bin' folder, as $COMPONENT.$OS-$ARCH.
+    requires:
+      vars:
+      - COMPONENTS
+      - OS
+      - ARCH
+    cmds:
+    - for:
+        var: COMPONENTS
+        as: COMPONENT
+      cmd: 'CGO_ENABLED=0 GOOS={{.OS}} GOARCH={{.ARCH}} go build -a -o {{.ROOT_DIR2}}/bin/{{.COMPONENT}}.{{.OS}}-{{.ARCH}} {{.ROOT_DIR2}}/cmd/{{.COMPONENT}}/main.go'
+
+  build-multi-raw:
+    desc: "  Build multi-platform binaries. Skips code generation/validation tasks."
+    requires:
+      vars:
+      - COMPONENTS
+    cmds:
+    - for:
+        matrix:
+          OS: [linux, darwin]
+          ARCH: [amd64, arm64]
+      vars:
+        OS: '{{.ITEM.OS}}'
+        ARCH: '{{.ITEM.ARCH}}'
+      task: build-raw
+
+  all:
+    desc: "  Build multi-platform binaries."
+    aliases:
+    - build-multi
+    requires:
+      vars:
+      - COMPONENTS
+    cmds:
+    - for:
+        matrix:
+          OS: [linux, darwin]
+          ARCH: [amd64, arm64]
+      vars:
+        OS: '{{.ITEM.OS}}'
+        ARCH: '{{.ITEM.ARCH}}'
+      task: build

@@ -1,0 +1,156 @@
+version: 3
+
+includes:
+  tools:
+    taskfile: tasks_tools.yaml
+    internal: true
+
+tasks:
+  # This is a dummy task that serves as a separator between task namespaces in the 'task -l' output.
+  "---":
+    desc: "{{.GEN_SEP}}"
+    cmds:
+    - cmd: echo "{{.SEP_MSG}}"
+      silent: true
+
+  tidy:
+    desc: "  Run 'go mod tidy' for all modules."
+    run: once
+    vars:
+      GO_VERSION:
+        sh: grep -E 'go [0-9]+\.[0-9]+\.[0-9]+' <{{.ROOT_DIR2}}/go.mod | sed 's/go //' # extract go version from go.mod
+    cmds:
+    - for:
+        var: NESTED_MODULES
+        as: MODULE
+      cmd: '"{{.TASKFILE_DIR2}}/sed.sh" -E "s/go [0-9]+\.[0-9]+\.[0-9]+/go {{.GO_VERSION}}/" "{{.ROOT_DIR2}}/{{.MODULE}}/go.mod"' # align go version in nested modules
+    - for:
+        var: NESTED_MODULES
+        as: MODULE
+      cmd: ( cd {{.ROOT_DIR2}}/{{.MODULE}}; go mod tidy )
+    - cmd: ( cd {{.ROOT_DIR2}}; go mod tidy )
+    - cmd: '"{{.TASKFILE_DIR2}}/sed.sh" -E "s/toolchain go[0-9]+\.[0-9]+\.[0-9]+/toolchain go{{.GO_VERSION}}/" "{{.ROOT_DIR2}}/go.mod"' # overwrite toolchain in root go.mod file
+    - for:
+        var: NESTED_MODULES
+        as: MODULE
+      cmd: '"{{.TASKFILE_DIR2}}/sed.sh" -E "s/toolchain go[0-9]+\.[0-9]+\.[0-9]+/toolchain go{{.GO_VERSION}}/" "{{.ROOT_DIR2}}/{{.MODULE}}/go.mod"' # overwrite toolchain in nested go.mod files
+
+  all:
+    desc: "  Combines all code generation tasks, including formatting."
+    run: once
+    aliases:
+    - generate
+    cmds:
+    - task: tidy
+    - task: code
+    - task: manifests
+    - task: docs
+    - task: format
+
+  manifests:
+    desc: "  Generate manifests for CRDs."
+    run: once
+    status:
+    - '[ "{{.API_DIRS | default ""}}" == "" ] || [ "{{.MANIFEST_OUT | default ""}}" == "" ]'
+    cmds:
+    - task: manifests-internal
+
+  manifests-internal:
+    desc: "  Generate manifests for CRDs."
+    run: when_changed
+    deps:
+    - tools:controller-gen
+    requires:
+      vars:
+      - API_DIRS
+      - MANIFEST_OUT
+    cmds:
+    - cmd: rm -rf {{.MANIFEST_OUT}}
+    - for:
+        var: API_DIRS
+      cmd: '{{.CONTROLLER_GEN}} crd paths={{.ITEM}} output:crd:artifacts:config={{.MANIFEST_OUT}}'
+    internal: true
+
+  code:
+    desc: "  Generate code (mainly DeepCopy functions) for all modules."
+    run: once
+    status:
+    - '[ "{{.API_DIRS | default ""}}" == "" ]'
+    cmds:
+    - task: code-internal
+
+  code-internal:
+    desc: "  Generate code (mainly DeepCopy functions) for all modules."
+    run: once
+    deps:
+    - tools:controller-gen
+    requires:
+      vars:
+      - API_DIRS
+    cmds:
+    - for:
+        var: API_DIRS
+      cmd: '{{.CONTROLLER_GEN}} object paths={{.ITEM}}'
+    internal: true
+
+  docs:
+    desc: "  Generate the documentation index for the project. No effect, unless GENERATE_DOCS_INDEX is set to 'true' in the Taskfile."
+    run: once
+    status:
+    - '[ "{{.GENERATE_DOCS_INDEX | default "false"}}" == "false" ]'
+    cmds:
+    - task: docs-internal
+
+  docs-internal:
+    desc: "  Generate the documentation index for the project."
+    run: once
+    deps:
+    - tools:jq
+    cmds:
+    - 'PROJECT_ROOT="{{.ROOT_DIR2}}" JQ="{{.JQ}}" {{.TASKFILE_DIR2}}/generate-docs-index.sh'
+    internal: true
+
+  fmt-internal:
+    desc: "  Run 'go fmt' for a single module."
+    run: when_changed
+    requires:
+      vars:
+      - MODULE
+    cmds:
+    - '( cd {{.ROOT_DIR2}}/{{.MODULE}}; go fmt ./...; )'
+    internal: true
+
+  fmt:
+    desc: "  Run 'go fmt' for all modules."
+    run: once
+    cmds:
+    - for:
+        var: NESTED_MODULES
+      vars:
+        MODULE: '{{.ITEM}}'
+      task: fmt-internal
+    - vars:
+        MODULE: ""
+      task: fmt-internal
+
+  format-imports:
+    desc: "  Run 'goimports'."
+    run: once
+    deps:
+    - tools:goimports
+    requires:
+      vars:
+      - CODE_DIRS
+      - MODULE_NAME
+    vars:
+      code_dirs:
+        sh: '{{.TASKFILE_DIR2}}/unfold.sh --clean --no-unfold --inline {{.CODE_DIRS}}' # goimports doesn't like the '/...' syntax
+    cmds:
+    - '{{.FORMATTER}} -l -w -local={{.MODULE_NAME}} {{.code_dirs}}'
+
+  format:
+    desc: "  Combines all formatting tasks."
+    run: once
+    cmds:
+    - task: fmt
+    - task: format-imports

@@ -1,0 +1,159 @@
+version: 3
+
+tasks:
+  localbin:
+    desc: "  Ensure that the folder specified in LOCALBIN exists."
+    run: once
+    requires:
+      vars:
+      - LOCALBIN
+    status:
+    - test -d {{.LOCALBIN}}
+    cmds:
+    - 'echo "localbin: {{.LOCALBIN}}"'
+    - mkdir -p {{.LOCALBIN}}
+    internal: true
+
+  localtmp:
+    desc: "  Ensure that the folder specified in LOCALTMP exists."
+    run: once
+    requires:
+      vars:
+      - LOCALTMP
+    status:
+    - test -d {{.LOCALTMP}}
+    cmds:
+    - 'echo "localtmp: {{.LOCALTMP}}"'
+    - mkdir -p {{.LOCALTMP}}
+    internal: true
+
+  controller-gen:
+    desc: "  Ensure that controller-gen is installed."
+    run: once
+    requires:
+      vars:
+      - CONTROLLER_GEN
+      - CONTROLLER_GEN_VERSION
+    deps:
+    - localbin
+    status:
+    - test -x {{.CONTROLLER_GEN}}
+    - '{{.CONTROLLER_GEN}} --version | grep -q "{{.CONTROLLER_GEN_VERSION}}"'
+    cmds:
+    - 'GOBIN="{{.LOCALBIN}}" go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_GEN_VERSION}}'
+    internal: true
+
+  goimports:
+    desc: "  Ensure that goimports is installed."
+    run: once
+    requires:
+      vars:
+      - FORMATTER
+      - FORMATTER_VERSION
+    deps:
+    - localbin
+    status:
+    - test -x {{.FORMATTER}}
+    - test -f {{.LOCALBIN}}/formatter_version
+    - 'cat {{.LOCALBIN}}/formatter_version | grep -q "{{.FORMATTER_VERSION}}"'
+    cmds:
+    - 'GOBIN="{{.LOCALBIN}}" go install golang.org/x/tools/cmd/goimports@{{.FORMATTER_VERSION}}'
+    - echo -n "{{.FORMATTER_VERSION}}" > {{.LOCALBIN}}/formatter_version
+    internal: true
+
+  golangci-lint:
+    desc: "  Ensure that golangci-lint is installed."
+    run: once
+    requires:
+      vars:
+      - LINTER
+      - LINTER_VERSION
+    deps:
+    - localbin
+    status:
+    - test -x {{.LINTER}}
+    - '{{.LINTER}} --version | grep -q {{.LINTER_VERSION | trimPrefix "v"}}'
+    cmds:
+    - 'curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b {{.LOCALBIN}} {{.LINTER_VERSION}}'
+    internal: true
+
+  jq:
+    desc: "  Ensure that jq is installed."
+    run: once
+    requires:
+      vars:
+      - JQ
+      - JQ_VERSION
+    deps:
+    - localbin
+    vars:
+      JQ_OS:
+        sh: 'if [[ "{{.OS}}" == "darwin" ]]; then echo "macos"; else echo "{{.OS}}"; fi' # jq uses 'macos' instead of 'darwin'
+    status:
+    - test -x {{.JQ}}
+    - '{{.JQ}} --version | grep -q "{{.JQ_VERSION | trimPrefix "v"}}"'
+    cmds:
+    - 'curl -sfL "https://github.com/jqlang/jq/releases/download/jq-{{.JQ_VERSION | trimPrefix "v"}}/jq-{{.JQ_OS}}-{{.ARCH}}" --output "{{.JQ}}"'
+    - 'chmod +x "{{.JQ}}"'
+    internal: true
+
+  helm:
+    desc: "  Ensure that helm is installed."
+    run: once
+    requires:
+      vars:
+      - HELM
+      - HELM_VERSION
+    deps:
+    - localbin
+    status:
+    - test -x "{{.HELM}}"
+    - '"{{.HELM}}" version --short | grep -q {{.HELM_VERSION}}'
+    vars:
+      tmpdir:
+        sh: 'mktemp -d'
+    cmds:
+    - 'mkdir -p {{.tmpdir}}/helm-unpacked'
+    - 'curl -sfL "https://get.helm.sh/helm-{{.HELM_VERSION}}-{{.OS}}-{{.ARCH}}.tar.gz" --output "{{.tmpdir}}/helm.tar.gz"'
+    - 'tar -xzf "{{.tmpdir}}/helm.tar.gz" --directory "{{.tmpdir}}/helm-unpacked"'
+    - 'mv "{{.tmpdir}}/helm-unpacked/{{.OS}}-{{.ARCH}}/helm" "{{.HELM}}"'
+    - 'chmod +x "{{.HELM}}"'
+    - 'rm -rf "{{.tmpdir}}"'
+    internal: true
+
+  yaml2json:
+    desc: "  Ensure that yaml2json is installed."
+    run: once
+    requires:
+      vars:
+      - YAML2JSON
+      - YAML2JSON_VERSION
+    deps:
+    - localbin
+    status:
+    - 'test -x "{{.YAML2JSON}}"'
+    - '"{{.YAML2JSON}}" --version | grep -q "{{.YAML2JSON_VERSION | trimPrefix "v"}}"'
+    cmds:
+    - 'curl -sfL "https://github.com/bronze1man/yaml2json/releases/download/{{.YAML2JSON_VERSION}}/yaml2json_{{.OS}}_{{.ARCH}}" --output "{{.LOCALBIN}}/yaml2json"'
+    - 'chmod +x "{{.YAML2JSON}}"'
+    internal: true
+
+  ocm:
+    desc: "  Ensure that the ocm CLI is installed."
+    run: once
+    requires:
+      vars:
+      - OCM
+      - OCM_VERSION
+    deps:
+    - localbin
+    status:
+    - 'test -x "{{.OCM}}"'
+    - '"{{.OCM}}" --version | grep -q "{{.OCM_VERSION | trimPrefix "v"}}"'
+    vars:
+      tmpdir:
+        sh: 'mktemp -d'
+    cmds:
+    - 'curl -sSfL https://ocm.software/install.sh | OCM_VERSION="{{.OCM_VERSION | trimPrefix "v"}}" bash -s "{{.tmpdir}}"'
+    - 'mv "{{.tmpdir}}/ocm" "{{.OCM}}"'
+    internal: true

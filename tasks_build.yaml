@@ -1,0 +1,27 @@
+version: 3
+
+includes:
+  bin:
+    taskfile: tasks_build_bin.yaml
+  img:
+    taskfile: tasks_build_img.yaml
+  helm:
+    taskfile: tasks_build_helm.yaml
+  ocm:
+    taskfile: tasks_build_ocm.yaml
+
+tasks:
+  # This is a dummy task that serves as a separator between task namespaces in the 'task -l' output.
+  "---":
+    desc: "{{.BLD_SEP}}"
+    cmds:
+    - cmd: echo "{{.SEP_MSG}}"
+      silent: true
+
+  all:
+    desc: "  Builds binaries and images, packages helm charts, builds the OCM component, and pushes everything into the respective registries."
+    run: once
+    cmds:
+    - task: img:all
+    - task: helm:all
+    - task: ocm:all

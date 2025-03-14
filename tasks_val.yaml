@@ -1,0 +1,108 @@
+version: 3
+
+includes:
+  tools:
+    taskfile: tasks_tools.yaml
+    internal: true
+
+tasks:
+  # This is a dummy task that serves as a separator between task namespaces in the 'task -l' output.
+  "---":
+    desc: "{{.VAL_SEP}}"
+    cmds:
+    - cmd: echo "{{.SEP_MSG}}"
+      silent: true
+
+  all:
+    desc: "  Combines all validation tasks."
+    run: once
+    cmds:
+    - task: validate
+    - task: test
+
+  test:
+    desc: "  Run all tests."
+    run: once
+    requires:
+      vars:
+      - CODE_DIRS
+    cmds:
+    - 'PROJECT_ROOT="{{.ROOT_DIR2}}" NESTED_MODULES="{{.NESTED_MODULES}}" {{.TASKFILE_DIR2}}/run-tests.sh {{.CODE_DIRS}}'
+
+  validate:
+    desc: "  Combines all validation tasks except for tests."
+    run: once
+    aliases:
+    - verify
+    - check
+    cmds:
+    - task: vet
+    - task: lint
+    - task: format-imports
+    - task: docs
+
+  docs:
+    desc: "  Checks if the documentation index is up-to-date."
+    run: once
+    status:
+    - '[ "{{.GENERATE_DOCS_INDEX | default "false"}}" == "false" ]'
+    cmds:
+    - task: docs-internal
+
+  docs-internal:
+    desc: "  Checks if the documentation index is up-to-date."
+    run: once
+    deps:
+    - tools:jq
+    cmds:
+    - 'PROJECT_ROOT="{{.ROOT_DIR2}}" JQ="{{.JQ}}" {{.TASKFILE_DIR2}}/verify-docs-index.sh'
+    internal: true
+
+  vet-internal:
+    desc: "  Run 'go vet' for a single module."
+    run: once
+    requires:
+      vars:
+      - MODULE
+    cmds:
+    - '( cd {{.ROOT_DIR2}}/{{.MODULE}}; go vet ./...; )'
+    internal: true
+
+  vet:
+    desc: "  Run 'go vet' for all modules."
+    run: once
+    cmds:
+    - for:
+        var: NESTED_MODULES
+      vars:
+        MODULE: '{{.ITEM}}'
+      task: vet-internal
+    - vars:
+        MODULE: ""
+      task: vet-internal
+
+  lint:
+    desc: "  Run 'golangci-lint'."
+    run: once
+    deps:
+    - tools:golangci-lint
+    requires:
+      vars:
+      - LINTER
+    cmds:
+    - 'PROJECT_ROOT="{{.ROOT_DIR2}}" NESTED_MODULES="{{.NESTED_MODULES}}" LINTER="{{.LINTER}}" {{.TASKFILE_DIR2}}/run-lint.sh {{.CODE_DIRS}}'
+
+  format-imports:
+    desc: "  Check if 'goimports' has been run."
+    run: once
+    deps:
+    - tools:goimports
+    requires:
+      vars:
+      - CODE_DIRS
+      - MODULE_NAME
+    vars:
+      code_dirs:
+        sh: '{{.TASKFILE_DIR2}}/unfold.sh --clean --no-unfold --inline {{.CODE_DIRS}}' # goimports doesn't like the '/...' syntax
+    cmds:
+    - 'tmp=$({{.FORMATTER}} -l -local={{.MODULE_NAME}} {{.code_dirs}}); if [[ "$tmp" ]]; then echo "Unformatted files detected:"; echo "$tmp"; exit 1; fi'

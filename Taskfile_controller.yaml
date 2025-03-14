@@ -1,0 +1,67 @@
+version: 3
+
+# This Taskfile is meant to be included for controller repos.
+# In addition to the library tasks, it contains tasks for building binaries and images.
+
+run: once
+method: checksum
+
+includes:
+  lib:
+    taskfile: Taskfile_library.yaml
+    flatten: true
+  build:
+    taskfile: tasks_build.yaml
+    aliases:
+    - bld
+    - b
+
+tasks:
+
+  # The following tasks are non-namespaced aliases for the most important namespaced tasks.
+  # This helps with visibility on 'task -l'.
+
+  all:
+    desc: "  Run code generation and validation, build all artifacts and push them to the respective registries."
+    summary: This is an alias for 'build:all'.
+    run: once
+    deps:
+    - build:all
+
+  build:
+    desc: "  Build the binaries. Includes code generation and validation."
+    summary: This is an alias for 'build:bin:all'.
+    run: once
+    deps:
+    - build:bin:all
+
+  build-raw:
+    desc: "  Like 'build', but skips code generation/validation tasks."
+    summary: This is an alias for 'build:bin:build-multi-raw'.
+    run: once
+    deps:
+    - build:bin:build-multi-raw
+  
+  image:
+    desc: "  Build and push the images. Includes binary build."
+    summary: This is an alias for 'build:img:all'.
+    run: once
+    deps:
+    - build:img:all
+
+  helm:
+    desc: "  Package and push the helm charts."
+    summary: This is an alias for 'build:helm:all'.
+    aliases:
+    - chart
+    - helm-chart
+    run: once
+    deps:
+    - build:helm:all
+
+  ocm:
+    desc: "  Build and push the OCM component."
+    summary: This is an alias for 'build:ocm:all'.
+    run: once
+    deps:
+    - build:ocm:all
