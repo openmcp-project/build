@@ -1,0 +1,138 @@
+version: 3
+
+tasks:
+  # This is a dummy task that serves as a separator between task namespaces in the 'task -l' output.
+  "---":
+    desc: "{{.RLS_SEP}}"
+    cmds:
+    - cmd: echo "{{.SEP_MSG}}"
+      silent: true
+
+  patch:
+    desc: "  Prepares a new patch release by creating a commit that will result in a patch release when pushed."
+    run: once
+    requires:
+      vars:
+      - VERSION
+    cmds:
+    - task: release-internal
+      vars:
+        RELEASE_VERSION:
+          sh: 'VERSION={{.VERSION}} "{{.TASKFILE_DIR2}}/compute-next-release-version.sh" patch'
+
+  minor:
+    desc: "  Prepares a new minor release by creating a commit that will result in a minor release when pushed."
+    run: once
+    requires:
+      vars:
+      - VERSION
+    cmds:
+    - task: release-internal
+      vars:
+        RELEASE_VERSION:
+          sh: 'VERSION={{.VERSION}} "{{.TASKFILE_DIR2}}/compute-next-release-version.sh" minor'
+
+  major:
+    desc: "  Prepares a new major release by creating a commit that will result in a major release when pushed."
+    run: once
+    requires:
+      vars:
+      - VERSION
+    cmds:
+    - task: release-internal
+      vars:
+        RELEASE_VERSION:
+          sh: 'VERSION={{.VERSION}} "{{.TASKFILE_DIR2}}/compute-next-release-version.sh" major'
+
+  prompt-changes:
+    desc: "  Causes a prompt if there are uncommitted changes which would be included in the release commit."
+    run: once
+    vars:
+      changes:
+        sh: '( cd "{{.ROOT_DIR2}}"; git status --short )'
+    status:
+    - 'test -z "$( cd "{{.ROOT_DIR2}}" && git status --porcelain=v1)"'
+    prompt:
+    - 'There are uncommitted changes in the working directory:{{"\n"}}{{.changes}}{{"\n\n"}}These changes will be included in the release commit, unless you stash, commit, or remove them otherwise before. Do you want to continue?'
+    internal: true
+  
+  release-internal:
+    desc: "  Prepares a new release by creating a commit that will result in a release when pushed."
+    run: once
+    deps:
+    - prompt-changes
+    requires:
+      vars:
+      - RELEASE_VERSION
+    prompt:
+    - 'The release version will be {{.RELEASE_VERSION}}. Do you want to continue?'
+    cmds:
+    - cmd: 'echo "Creating release commit for version {{.RELEASE_VERSION}} ..."'
+      silent: true
+    - vars:
+        CLI_ARGS: '{{.RELEASE_VERSION}}'
+      task: set-version
+    - '( cd "{{.ROOT_DIR2}}"; git add --all; git commit -m "release {{.RELEASE_VERSION}}" )'
+    internal: true
+
+  set-version:
+    desc: '  Updates all versions to the specified version. Usage: task {{.TASK}} -- <version>'
+    summary: |
+      This task is called by the release tasks automatically.
+      It sets the following versions to the one provided as argument:
+      - the VERSION file in the root directory
+      - 'version' in the Chart.yaml file of each component's helm chart
+      - 'appVersion' in the Chart.yaml file of each component's helm chart
+      - 'tag' in the values.yaml file of each component's helm chart
+      - the imported version of each nested module in the root go.mod file
+    run: once
+    requires:
+      vars:
+      - COMPONENTS
+      - NESTED_MODULES
+      - MODULE_NAME
+    preconditions:
+    - sh: 'test "{{len .CLI_ARGS}}" -gt 0'
+      msg: 'This task requires a version argument. Usage: task {{.TASK}} -- <version>'
+    vars:
+      VERSION: '{{.CLI_ARGS | splitList " " | first}}'
+    cmds:
+    - 'echo -n "{{.VERSION}}" > "{{.ROOT_DIR2}}/VERSION"'
+    - for:
+        var: COMPONENTS
+      vars:
+        COMPONENT: '{{.ITEM}}'
+        VERSION: '{{.VERSION}}'
+      task: set-chart-version-internal
+    - for:
+        var: NESTED_MODULES
+      vars:
+        MODULE: '{{.ITEM}}'
+        VERSION: '{{.VERSION}}'
+        MODULE_NAME: '{{.MODULE_NAME}}'
+      task: set-module-version-internal
+
+  set-chart-version-internal:
+    desc: "  Sets the versions in the helm chart for a specific component."
+    run: always
+    requires:
+      vars:
+      - VERSION
+      - COMPONENT
+    cmds:
+    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@version: v?[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+.*@version: {{.VERSION}}@1" "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml"'
+    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@appVersion: v?[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+.*@appVersion: {{.VERSION}}@1" "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml"'
+    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@  tag: .*@  tag: {{.VERSION}}@" "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/values.yaml"'
+    internal: true
+
+  set-module-version-internal:
+    desc: "  Sets the imported version of a nested module in the root go.mod file."
+    run: always
+    requires:
+      vars:
+      - VERSION
+      - MODULE
+      - MODULE_NAME
+    cmds:
+    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@	{{.MODULE_NAME}}/{{.MODULE}} .*@	{{.MODULE_NAME}}/{{.MODULE}} {{.VERSION}}@" "{{.ROOT_DIR2}}/go.mod"'
+    internal: true

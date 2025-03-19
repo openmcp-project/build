@@ -1,0 +1,124 @@
+version: 3
+
+# This Taskfile is meant to be included for library repos.
+# It contains tasks for code generation, validation, and release management.
+
+run: once
+method: checksum
+
+includes:
+  generate:
+    taskfile: tasks_gen.yaml
+    aliases:
+    - gen
+    - g
+  tools:
+    taskfile: tasks_tools.yaml
+  validate:
+    taskfile: tasks_val.yaml
+    aliases:
+    - val
+    - v
+  release:
+    taskfile: tasks_rls.yaml
+    aliases:
+    - rls
+    - r
+
+vars:
+  # whacky workarounds for incorrect paths in the special variables
+  # see https://github.com/go-task/task/issues/2056 and https://github.com/go-task/task/issues/2057
+  ROOT_DIR2: '{{.ROOT_DIR | trimSuffix "/common" | trimSuffix "/hack"}}'
+  TASKFILE_DIR2:
+    sh: 'if [[ "{{.TASKFILE_DIR}}" == "{{.ROOT_DIR2}}" ]] || [[ "{{.TASKFILE_DIR}}" == "" ]]; then echo -n "{{.ROOT_DIR2}}/hack/common"; else echo -n "{{.TASKFILE_DIR}}"; fi'
+
+  VERSION:
+    sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-version.sh'
+  OS:
+    sh: echo ${OS:-$(go env GOOS)}
+  ARCH:
+    sh: echo ${ARCH:-$(go env GOARCH)}
+  MODULE_NAME:
+    sh: 'cat "{{.ROOT_DIR2}}/go.mod" | grep "module " | sed "s/module //" | sed -E "s/[[:blank:]].*//"'
+  NESTED_MODULES: '{{.NESTED_MODULES | default "" }}'
+
+  LOCALBIN: '{{ .LOCALBIN | default (print .ROOT_DIR2 "/bin") }}'
+  LOCALTMP: '{{ .LOCALTMP | default (print .ROOT_DIR2 "/tmp") }}'
+  CONTROLLER_GEN: '{{ .CONTROLLER_GEN | default (print .LOCALBIN "/controller-gen") }}'
+  CONTROLLER_GEN_VERSION: '{{ .CONTROLLER_GEN_VERSION | default "v0.16.4" }}'
+  FORMATTER: '{{ .FORMATTER | default (print .LOCALBIN "/goimports") }}'
+  FORMATTER_VERSION: '{{ .FORMATTER_VERSION | default "v0.26.0" }}'
+  LINTER: '{{ .LINTER | default (print .LOCALBIN "/golangci-lint") }}'
+  LINTER_VERSION: '{{ .LINTER_VERSION | default "v1.64.4" }}'
+  JQ: '{{ .JQ | default (print .LOCALBIN "/jq") }}'
+  JQ_VERSION: '{{ .JQ_VERSION | default "v1.7.1" }}'
+  HELM: '{{ .HELM | default (print .LOCALBIN "/helm") }}'
+  HELM_VERSION: '{{ .HELM_VERSION | default "v3.17.1" }}'
+  YAML2JSON: '{{ .YAML2JSON | default (print .LOCALBIN "/yaml2json") }}'
+  YAML2JSON_VERSION: '{{ .YAML2JSON_VERSION | default "v1.3.5" }}'
+  OCM: '{{ .OCM | default (print .LOCALBIN "/ocm") }}'
+  OCM_VERSION: '{{ .OCM_VERSION | default "v0.21.0" }}'
+
+  DOCKER_BUILDER_NAME: # move to build taskfile later
+    sh: 'echo -n ${DOCKER_BUILDER_NAME:-"openmcp-multiarch-builder"}'
+
+  # separator strings
+  SEP_MSG: "This is just a separator, what did you expect to happen?"
+  MAIN_SEP:    "MAIN ###########################################################################"
+  GEN_SEP:     "CODE GENERATION ### generate / gen / g #########################################"
+  VAL_SEP:     "CODE VALIDATION ### validate / val / v #########################################"
+  BLD_SEP:     "BUILD ARTIFACTS ### build / bld / b ############################################"
+  BLD_BIN_SEP: "BINARY BUILD --- bin -----------------------------------------------------------"
+  BLD_IMG_SEP: "IMAGE BUILD --- img ------------------------------------------------------------"
+  BLD_HLM_SEP: "HELM CHART BUILD --- helm ------------------------------------------------------"
+  BLD_OCM_SEP: "OCM COMPONENT BUILD --- ocm ----------------------------------------------------"
+  RLS_SEP:     "RELEASE MANAGEMENT ### release / rls / r #######################################"
+
+tasks:
+
+  # This is a dummy task that serves as a separator between task namespaces in the 'task -l' output.
+  "---":
+    desc: "{{.MAIN_SEP}}"
+    cmds:
+    - cmd: echo "{{.SEP_MSG}}"
+      silent: true
+
+  default: # This is executed if 'task' is called without any arguments.
+    silent: true
+    deps:
+    - help
+
+  help:
+    silent: true
+    cmds:
+    - cmd: task -l
+      silent: true # for some reason, this is not needed here, but let's keep it for consistency
+
+  generate:
+    desc: "  Combines all code generation tasks, including formatting."
+    run: once
+    deps:
+    - gen:generate
+  
+  test:
+    desc: "  Run all tests."
+    run: once
+    deps:
+    - val:test
+  
+  validate:
+    desc: "  Combines all validation tasks except for tests."
+    run: once
+    aliases:
+    - verify
+    - check
+    deps:
+    - val:validate
+  
+  version:
+    desc: "  Print the version of the project. Use VERSION_OVERRIDE to make this task print a specific version."
+    run: once
+    cmds:
+    - cmd: 'echo "{{.VERSION}}"'
+      silent: true
+

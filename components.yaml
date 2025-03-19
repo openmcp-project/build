@@ -1,0 +1,120 @@
+# Usage:
+# 
+# Feed arguments into ocm CLI like this:
+#   ocm add componentversions ... -- CHART_REGISTRY=... IMG_REGISTRY=...
+#
+# Required values:
+# - VERSION (set via the ocm CLI's --version flag)
+#   - Used as version for the source element pointing to this repo.
+#   - Used as referenced GitHub release, if it does not contain a '-dev'.
+#   - Used as fallback value for other versions.
+# - COMMIT
+#   - Commit hash of the git commit used to generate this component descriptor.
+#   - Used for the source element pointing to this repo.
+# - CHART_REGISTRY
+#   - URL of the OCI registry used for the helm charts
+# - IMG_REGISTRY
+#   - URL of the OCI registry used for the container images
+# - COMPONENTS
+#   - Comma-separated list of components for which resources should be added to the component descriptor, e.g. "apiserver-controller,managedcontrolplane-controller,landscaper-connector".
+#   - Not required if all of BP_COMPONENTS, CHART_COMPONENTS, and IMG_COMPONENTS are specified instead.
+# - MODULE_NAME
+#   - Name of the Go module.
+# - REPO_URL
+#   - URL of the git repository.
+#
+# Optional values:
+# - CD_VERSION
+#   - Version used for the component descriptor.
+#   - Defaults to VERSION if not specified.
+# - CHART_VERSION
+#   - Default version for referenced helm charts.
+#   - Defaults to VERSION if not specified.
+# - IMG_VERSION
+#   - Default version for referenced container images.
+#   - Defaults to VERSION if not specified.
+# - BP_PATH
+#   - Path to the blueprint directory. Must be specified if BP_COMPONENTS is set.
+# - BP_COMPONENTS
+#   - Comma-separated list of components for which the blueprint should be added to the component descriptor, e.g. "apiserver-controller,managedcontrolplane-controller,landscaper-connector"
+#   - Each element will result in a resource entry of type 'landscaper.gardener.cloud/blueprint' named '<component>-blueprint'. The corresponding blueprint is expected at 'BP_PATH/<component>' (relative to this file).
+#   - Defaults to COMPONENTS if BP_PATH is set and is empty otherwise.
+# - CHART_COMPONENTS
+#   - Comma-separated list of components for which helm charts should be referenced in the component descriptor, optionally with version (separated by ":").
+#   - Example: "apiserver-controller:v0.1.0,managedcontrolplane-controller:v0.2.0,landscaper-connector"
+#   - Each element will result in a resource entry of type 'helmChart' named '<component>-chart'. The chart is expected in the OCI registry at '<CHART_REGISTRY>/<component>:<version>'.
+#   - Defaults to COMPONENTS if not specified.
+#   - Each chart's version defaults to CHART_VERSION if not specified.
+# - IMG_COMPONENTS
+#   - Comma-separated list of components for which container images should be referenced in the component descriptor, optionally with version (separated by ":").
+#   - Example: "apiserver-controller:v0.1.0,managedcontrolplane-controller:v0.2.0,landscaper-connector"
+#   - Each element will result in a resource entry of type 'ociImage' named '<component>-image'. The image is expected in the OCI registry at '<IMG_REGISTRY>/<component>:<version>'.
+#   - Defaults to COMPONENTS if not specified.
+#   - Each image's version defaults to IMG_VERSION if not specified.
+
+
+name: (( lower(values.MODULE_NAME) ))
+version: (( defaults.CD_VERSION ))
+provider:
+  name: openmcp.cloud
+
+sources:
+- name: (( ( "tmp" = split("/", values.REPO_URL) ) element(tmp, length(tmp) - 1) ))
+  type: blob
+  version: (( values.VERSION ))
+  access:
+    type: gitHub
+    repoUrl: (( values.REPO_URL ))
+    commit: (( values.COMMIT ))
+    ref: (( contains(values.VERSION, "-dev") ? ~~ :"refs/tags/" values.VERSION ))
+resources:
+- <<<: (( sum[funcs.splitIgnoreEmpty(",", defaults.BP_COMPONENTS)|[]|s,comp|-> s *templates.blueprint] ))
+- <<<: (( sum[funcs.splitIgnoreEmpty(",", defaults.CHART_COMPONENTS)|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "chart_version" = (cvs[1] || defaults.CHART_VERSION)) s *templates.chart] ))
+- <<<: (( sum[funcs.splitIgnoreEmpty(",", defaults.IMG_COMPONENTS)|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "img_version" = (cvs[1] || defaults.IMG_VERSION)) s *templates.image] ))
+
+
+# ##########################################################################
+# # Everything below this is temporary stuff only required during rendering and will not be part of the generated component descriptor.
+
+defaults:
+  <<<: (( &temporary ))
+  CD_VERSION: (( funcs.notEmpty(values.CD_VERSION || "") ? values.CD_VERSION :values.VERSION ))
+  CHART_VERSION: (( funcs.notEmpty(values.CHART_VERSION || "") ? values.CHART_VERSION :values.VERSION ))
+  IMG_VERSION: (( funcs.notEmpty(values.IMG_VERSION || "") ? values.IMG_VERSION :values.VERSION ))
+  BP_COMPONENTS: (( funcs.notEmpty(values.BP_PATH || "") ? ( funcs.notEmpty(values.BP_COMPONENTS || "") ? values.BP_COMPONENTS :values.COMPONENTS ) :"" ))
+  CHART_COMPONENTS: (( funcs.notEmpty(values.CHART_COMPONENTS || "") ? values.CHART_COMPONENTS :values.COMPONENTS ))
+  IMG_COMPONENTS: (( funcs.notEmpty(values.IMG_COMPONENTS || "") ? values.IMG_COMPONENTS :values.COMPONENTS ))
+
+funcs:
+  <<<: (( &temporary ))
+  notEmpty: (( |x|-> x != "" )) # returns true if the input is not an empty string
+  splitIgnoreEmpty: (( |d,s|-> select[split(d, s)|x|-> x != ""] )) # splits a string by a delimiter and removes empty elements
+
+templates:
+  <<<: (( &temporary ))
+  blueprint:
+    <<<: (( &template ))
+    name: (( comp "-blueprint" ))
+    type: landscaper.gardener.cloud/blueprint
+    input:
+      path: (( "../blueprints/" comp ))
+      type: dir
+  chart:
+    <<<: (( &template ))
+    name: (( comp "-chart" ))
+    type: helmChart
+    version: (( chart_version ))
+    access:
+      type: ociArtifact
+      imageReference: (( values.CHART_REGISTRY "/" comp ":" chart_version ))
+  image:
+    <<<: (( &template ))
+    name: (( comp "-image" ))
+    type: ociImage
+    version: (( img_version ))
+    access:
+      imageReference: (( values.IMG_REGISTRY "/" comp ":" img_version ))
+      type: ociArtifact
+
+
+

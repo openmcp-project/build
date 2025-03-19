@@ -1,0 +1,97 @@
+version: 3
+
+includes:
+  tools:
+    taskfile: tasks_tools.yaml
+    internal: true
+
+tasks:
+  # This is a dummy task that serves as a separator between task namespaces in the 'task -l' output.
+  "---":
+    desc: "{{.BLD_HLM_SEP}}"
+    cmds:
+    - cmd: echo "{{.SEP_MSG}}"
+      silent: true
+
+  all:
+    desc: "  Packages and pushes the helm charts for all components."
+    run: once
+    aliases:
+    - helm
+    cmds:
+    - task: build
+    - task: push
+
+  build:
+    desc: "  Packages the helm chart to prepare it for being pushed to the registry."
+    run: once
+    requires:
+      vars:
+      - COMPONENTS
+      - VERSION
+    cmds:
+    - for:
+        var: COMPONENTS
+      vars:
+        COMPONENT: '{{.ITEM}}'
+        VERSION: '{{.VERSION}}'
+      task: build-internal
+  
+  build-internal:
+    desc: "  Packages the helm chart of a specific component to prepare it for being pushed to the registry."
+    run: when_changed
+    deps:
+    - tools:localtmp
+    - tools:helm
+    requires:
+      vars:
+      - COMPONENT
+      - VERSION
+    status:
+    - 'test ! -f "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml"'
+    cmds:
+    - '"{{.HELM}}" package "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}" -d "{{.LOCALTMP}}" --version "{{.VERSION}}"'
+    internal: true
+
+  push:
+    desc: "  Push the helm chart to the registry. Requires the chart to have been packaged before."
+    run: once
+    requires:
+      vars:
+      - COMPONENTS
+      - VERSION
+    vars:
+      HELM_REGISTRY:
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --helm'
+    cmds:
+    - for:
+        var: COMPONENTS
+      vars:
+        COMPONENT: '{{.ITEM}}'
+        VERSION: '{{.VERSION}}'
+        HELM_REGISTRY: '{{.HELM_REGISTRY}}'
+      task: push-internal
+
+  push-internal:
+    desc: "  Push the helm chart of a specific component to the registry."
+    run: when_changed
+    deps:
+    - tools:helm
+    - tools:yaml2json
+    - tools:jq
+    requires:
+      vars:
+      - COMPONENT
+      - VERSION
+      - HELM_REGISTRY
+      - LOCALTMP
+    status:
+    - 'test ! -f "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml"'
+    vars:
+      CHART_NAME: # vars are evaluated before status, therefore the duplicated check
+        sh: 'if [[ -f "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml" ]]; then cat "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml" | {{.YAML2JSON}} | {{.JQ}} -r .name; else echo -n "{{.COMPONENT}}"; fi'
+    cmds:
+    - '"{{.HELM}}" push "{{.LOCALTMP}}/{{.CHART_NAME}}-{{.VERSION}}.tgz" "oci://{{.HELM_REGISTRY}}"'
+    - 'rm -f "{{.LOCALTMP}}/{{.CHART_NAME}}-{{.VERSION}}.tgz"'
+    internal: true
+

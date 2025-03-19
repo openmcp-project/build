@@ -1,0 +1,78 @@
+version: 3
+
+includes:
+  tools:
+    taskfile: tasks_tools.yaml
+    internal: true
+
+tasks:
+  # This is a dummy task that serves as a separator between task namespaces in the 'task -l' output.
+  "---":
+    desc: "{{.BLD_OCM_SEP}}"
+    cmds:
+    - cmd: echo "{{.SEP_MSG}}"
+      silent: true
+
+  all:
+    desc: "  Builds and pushes the OCM component."
+    run: once
+    cmds:
+    - task: build
+    - task: push
+
+  build:
+    desc: "  Build the OCM component."
+    run: once
+    deps:
+    - tools:ocm
+    - tools:localtmp
+    requires:
+      vars:
+      - COMPONENTS
+      - VERSION
+      - MODULE_NAME
+      - REPO_URL
+    vars:
+      CHART_REGISTRY:
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --helm'
+      IMAGE_REGISTRY:
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --image'
+      COMMIT:
+        sh: '( cd "{{.ROOT_DIR2}}"; git rev-parse HEAD )'
+      compdir: '{{.LOCALTMP}}/component'
+    cmds:
+    - |
+      "{{.OCM}}" add componentversions --file "{{.compdir}}" --version "{{.VERSION}}" --create --force --templater spiff "{{.TASKFILE_DIR2}}/components.yaml" -- \
+        VERSION="{{.VERSION}}" \
+        CHART_REGISTRY="{{.CHART_REGISTRY}}" \
+        IMG_REGISTRY="{{.IMAGE_REGISTRY}}" \
+        COMMIT="{{.COMMIT}}" \
+        MODULE_NAME="{{.MODULE_NAME}}" \
+        REPO_URL="{{.REPO_URL}}" \
+        COMPONENTS="{{.COMPONENTS | trimSuffix " " | replace " " ","}}" \
+        CD_VERSION="{{.CD_VERSION | default ""}}" \
+        CHART_VERSION="{{.CHART_VERSION | default ""}}" \
+        IMG_VERSION="{{.IMG_VERSION | default ""}}" \
+        BP_COMPONENTS="{{.BP_COMPONENTS | default ""}}" \
+        CHART_COMPONENTS="{{.CHART_COMPONENTS | default ""}}" \
+        IMG_COMPONENTS="{{.IMG_COMPONENTS | default ""}}"
+    - cmd: echo "Use '$(realpath --relative-base="{{.USER_WORKING_DIR}}" "{{.OCM}}") get cv $(realpath --relative-base="{{.USER_WORKING_DIR}}" "{{.compdir}}") -o yaml' to view the generated component descriptor."
+      silent: true
+
+  push:
+    desc: "  Push the OCM component to the registry. It must have been built before. Set OVERWRITE_COMPONENTS to 'true' to overwrite existing component versions."
+    run: once
+    deps:
+    - tools:ocm
+    requires:
+      vars:
+      - VERSION
+      - LOCALTMP
+    vars:
+      COMPONENT_REGISTRY:
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --component'
+      overwrite_mod:
+        sh: 'if [[ -n ${OVERWRITE_COMPONENTS:-} ]] && [[ ${OVERWRITE_COMPONENTS} != "false" ]]; then echo -n "--overwrite"; fi'
+      compdir: '{{.LOCALTMP}}/component'
+    cmds:
+    - '"{{.OCM}}" transfer componentversions "{{.compdir}}" "{{.COMPONENT_REGISTRY}}" {{.overwrite_mod}}'
