@@ -1,6 +1,6 @@
 [![REUSE status](https://api.reuse.software/badge/github.com/openmcp-project/build)](https://api.reuse.software/info/github.com/openmcp-project/build)
 
-# build
+# Open Managed Control Planes Build and CI Scripts
 
 ## About this project
 
