@@ -56,7 +56,7 @@
 name: (( lower(values.MODULE_NAME) ))
 version: (( defaults.CD_VERSION ))
 provider:
-  name: sap.com
+  name: openmcp.cloud
 
 sources:
 - name: (( ( "tmp" = split("/", values.REPO_URL) ) element(tmp, length(tmp) - 1) ))
