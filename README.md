@@ -108,7 +108,7 @@ includes:
 
 Adding new specialized tasks in addition to the imported generic ones is straightforward: simply add the task definitions in the importing Taskfile.
 
-It is also possible to exclude or overwrite generic tasks. The following example uses an `external-apis` task that should be executed as part of the generic `generate:code` task.
+It is also possible to exclude or overwrite generic tasks. The following example uses an `external-apis` task that should be executed as part of the generic `generate:code` task, and it adds a envtest dependency to the `validate:test` task.
 
 Overwriting basically works by excluding and re-defining the generic task that should be overwritten. If the generic task's logic should be kept as part of the overwritten definition, the generic file needs to be imported a second time with `internal: true`, so that the original task can be called.
 
@@ -128,6 +128,9 @@ includes:
 tasks:
   generate:code: # overwrites shared code task to add external API fetching
     desc: "  Generate code (mainly DeepCopy functions) and fetches external APIs."
+    aliases:
+    - gen:code
+    - g:code
     run: once
     cmds:
     - task: external-apis
@@ -135,7 +138,20 @@ tasks:
 
   external-apis:
     desc: "  Fetch external APIs."
+    run: once
     <...>
+    internal: true
+
+  validate:test: # overwrites the test task to add a dependency towards envtest
+    desc: "  Run all tests."
+    aliases:
+    - val:test
+    - v:test
+    run: once
+    deps:
+    - tools:envtest
+    cmds:
+    - task: c:validate:test
 ```
 
 ### Makefile

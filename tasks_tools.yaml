@@ -157,3 +157,20 @@ tasks:
     - 'curl -sSfL https://ocm.software/install.sh | OCM_VERSION="{{.OCM_VERSION | trimPrefix "v"}}" bash -s "{{.tmpdir}}"'
     - 'mv "{{.tmpdir}}/ocm" "{{.OCM}}"'
     internal: true
+
+  envtest:
+    desc: "  Ensure that envtest is installed."
+    run: once
+    requires:
+      vars:
+      - ENVTEST
+      - ENVTEST_VERSION
+    deps:
+    - localbin
+    status:
+    - 'test -x "{{.ENVTEST}}"'
+    - test -f {{.LOCALBIN}}/envtest_version
+    - 'cat {{.LOCALBIN}}/envtest_version | grep -q "{{.ENVTEST_VERSION}}"'
+    cmds:
+    - 'GOBIN="{{.LOCALBIN}}" go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.ENVTEST_VERSION}}'
+    internal: true
