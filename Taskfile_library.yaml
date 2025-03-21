@@ -58,6 +58,8 @@ vars:
   YAML2JSON_VERSION: '{{ .YAML2JSON_VERSION | default "v1.3.5" }}'
   OCM: '{{ .OCM | default (print .LOCALBIN "/ocm") }}'
   OCM_VERSION: '{{ .OCM_VERSION | default "v0.21.0" }}'
+  ENVTEST: '{{ .ENVTEST | default (print .LOCALTMP "/setup-envtest") }}'
+  ENVTEST_VERSION: '{{ .ENVTEST_VERSION | default "release-0.16" }}'
 
   DOCKER_BUILDER_NAME: # move to build taskfile later
     sh: 'echo -n ${DOCKER_BUILDER_NAME:-"openmcp-multiarch-builder"}'
@@ -98,13 +100,13 @@ tasks:
     desc: "  Combines all code generation tasks, including formatting."
     run: once
     deps:
-    - gen:generate
+    - generate:generate
   
   test:
     desc: "  Run all tests."
     run: once
     deps:
-    - val:test
+    - validate:test
   
   validate:
     desc: "  Combines all validation tasks except for tests."
@@ -113,7 +115,7 @@ tasks:
     - verify
     - check
     deps:
-    - val:validate
+    - validate:validate
   
   version:
     desc: "  Print the version of the project. Use VERSION_OVERRIDE to make this task print a specific version."
