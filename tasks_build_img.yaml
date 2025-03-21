@@ -1,10 +1,5 @@
 version: 3
 
-includes:
-  build:bin:
-    taskfile: tasks_build_bin.yaml
-    internal: true
-
 tasks:
   # This is a dummy task that serves as a separator between task namespaces in the 'task -l' output.
   "---":
@@ -32,7 +27,7 @@ tasks:
       To overwrite this, set the 'OS' and 'ARCH' environment variables.
       To overwrite the image's base path, set the 'IMAGE_REGISTRY' environment variable.
     deps:
-    - task: build:bin:build
+    - task: :bin:build # this requires a bin:build task to have been defined in the importing Taskfile
       vars:
         OS: '{{.OS}}'
         ARCH: '{{.ARCH}}'
