@@ -77,8 +77,6 @@ tasks:
     run: when_changed
     deps:
     - tools:helm
-    - tools:yaml2json
-    - tools:jq
     requires:
       vars:
       - COMPONENT
@@ -88,8 +86,7 @@ tasks:
     status:
     - 'test ! -f "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml"'
     vars:
-      CHART_NAME: # vars are evaluated before status, therefore the duplicated check
-        sh: 'if [[ -f "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml" ]]; then cat "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml" | {{.YAML2JSON}} | {{.JQ}} -r .name; else echo -n "{{.COMPONENT}}"; fi'
+      CHART_NAME: '{{.COMPONENT}}' # this requires the chart name to be the same as the component name
     cmds:
     - '"{{.HELM}}" push "{{.LOCALTMP}}/{{.CHART_NAME}}-{{.VERSION}}.tgz" "oci://{{.HELM_REGISTRY}}"'
     - 'rm -f "{{.LOCALTMP}}/{{.CHART_NAME}}-{{.VERSION}}.tgz"'
