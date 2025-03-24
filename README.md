@@ -55,37 +55,39 @@ includes:
 
 Since the imported Taskfile is generic, there are a few variables that need to be set in order to configure the tasks correctly. Unless specified otherwise, the variables must not be specified if their respective purpose doesn't apply to the importing repository (e.g. `NESTED_MODULES` is not required if there are no nested modules).
 - `NESTED_MODULES`
-    - List of nested modules, separated by spaces.
-    - Note that the module has to be located in a subfolder that matches its name.
-    - Required for multiple tools from the golang environment which are able to work on a single module only and therefore have to be called once per go module.
+  - List of nested modules, separated by spaces.
+  - Note that the module has to be located in a subfolder that matches its name.
+  - Required for multiple tools from the golang environment which are able to work on a single module only and therefore have to be called once per go module.
 - `API_DIRS`
-    - List of files with API type definitions for which k8s CRDs should be generated.
-    - The `<directory>/...` syntax can be used to refer to all files in the directory and its subdirectories.
-    - This is fed into the k8s code generation tool for CRD generation.
+  - List of files with API type definitions for which k8s CRDs should be generated.
+  - The `<directory>/...` syntax can be used to refer to all files in the directory and its subdirectories.
+  - This is fed into the k8s code generation tool for CRD generation.
 - `MANIFEST_OUT`
-    - Directory where the generated CRDs should be put in.
+  - Directory where the generated CRDs should be put in.
 - `CODE_DIRS`
-    - List of files with go code, separated by spaces.
-    - The `<directory>/...` syntax can be used to refer to all files in the directory and its subdirectories.
-    - Formatting and linting checks are executed on these files.
-    - This variable must always be specified.
+  - List of files with go code, separated by spaces.
+  - The `<directory>/...` syntax can be used to refer to all files in the directory and its subdirectories.
+  - Formatting and linting checks are executed on these files.
+  - This variable must always be specified.
 - `COMPONENTS`
-    - A list of 'components' contained in this repository, separated by spaces.
-    - This is relevant for binary, image, chart, and OCM component building. Each entry will result in a separate build artifact for the respective builds.
-    - A 'component' specified here has some implications:
-        - A `cmd/<component>/main.go` file is expected for binary builds.
-        - A separate docker image will be built for each component.
-        - If the component has a helm chart, it is expected under `charts/<component>/`.
-            - Note that support for helm charts is not fully implemented yet.
-        - Each component will get its own OCM component.
-            - Note that support for OCM components is not implemented yet.
-    - Library repos will not have any component, operator repos will mostly contain just a single component (the operator itself).
+  - A list of 'components' contained in this repository, separated by spaces.
+  - This is relevant for binary, image, chart, and OCM component building. Each entry will result in a separate build artifact for the respective builds.
+  - A 'component' specified here has some implications:
+    - A `cmd/<component>/main.go` file is expected for binary builds.
+    - A separate docker image will be built for each component.
+    - If the component has a helm chart, it is expected under `charts/<component>/`.
+      - Note that support for helm charts is not fully implemented yet.
+    - Each component will get its own OCM component.
+      - Note that support for OCM components is not implemented yet.
+  - Library repos will not have any component, operator repos will mostly contain just a single component (the operator itself).
 - `REPO_URL`
-    - URL of the github repository that contains the Taskfile.
-    - This is used for building the OCM component, which will fail if it is not specified.
+  - URL of the github repository that contains the Taskfile.
+  - This is used for building the OCM component, which will fail if it is not specified.
 - `GENERATE_DOCS_INDEX`
-    - If this is set and its value is not `false`, the `generate:docs` target will generate a documentation index at `docs/README.md`. Otherwise, the task is skipped.
-    - See below for a short documentation of the the index generation.
+  - If this is set and its value is not `false`, the `generate:docs` target will generate a documentation index at `docs/README.md`. Otherwise, the task is skipped.
+  - See below for a short documentation of the the index generation.
+- `ENVTEST_REQUIRED`
+  - If this is set to `true`, the `test` task will include the `setup-envtest` tooling in its dependencies and download it automatically.
 
 There are two main Taskfiles, one of which should be included:
 - `Taskfile_controller.yaml` is meant for operator repositories and contains task definitions for code generation and validation, binary builds, and image builds.
@@ -108,9 +110,11 @@ includes:
 
 Adding new specialized tasks in addition to the imported generic ones is straightforward: simply add the task definitions in the importing Taskfile.
 
-It is also possible to exclude or overwrite generic tasks. The following example uses an `external-apis` task that should be executed as part of the generic `generate:code` task, and it adds a envtest dependency to the `validate:test` task.
+It is also possible to exclude or overwrite generic tasks. The following example uses an `external-apis` task that should be executed as part of the generic `generate:code` task.
 
 Overwriting basically works by excluding and re-defining the generic task that should be overwritten. If the generic task's logic should be kept as part of the overwritten definition, the generic file needs to be imported a second time with `internal: true`, so that the original task can be called.
+
+Note that some tasks are re-used internally with a different name due to the way `task` handles scoping. If you overwrite a task and run into issues, you might have to overwrite the same task again with a different name. In theory, adding a fitting alias to the overwrite should suffice. This theory has not yet been tested, though.
 
 ```yaml
 includes:
@@ -141,17 +145,6 @@ tasks:
     run: once
     <...>
     internal: true
-
-  validate:test: # overwrites the test task to add a dependency towards envtest
-    desc: "  Run all tests."
-    aliases:
-    - val:test
-    - v:test
-    run: once
-    deps:
-    - tools:envtest
-    cmds:
-    - task: c:validate:test
 ```
 
 ### Makefile

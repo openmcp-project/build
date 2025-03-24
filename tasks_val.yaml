@@ -26,8 +26,19 @@ tasks:
     requires:
       vars:
       - CODE_DIRS
+    deps:
+    - test-envtest-dep
     cmds:
     - 'PROJECT_ROOT="{{.ROOT_DIR2}}" NESTED_MODULES="{{.NESTED_MODULES}}" {{.TASKFILE_DIR2}}/run-tests.sh {{.CODE_DIRS}}'
+
+  test-envtest-dep:
+    desc: "  Install the envtest dependency, if marked as required."
+    run: once
+    status:
+    - '[ "{{.ENVTEST_REQUIRED | default "false"}}" != "true" ]'
+    cmds:
+    - task: tools:envtest
+    internal: true
 
   validate:
     desc: "  Combines all validation tasks except for tests."

@@ -58,7 +58,7 @@ vars:
   YAML2JSON_VERSION: '{{ .YAML2JSON_VERSION | default "v1.3.5" }}'
   OCM: '{{ .OCM | default (print .LOCALBIN "/ocm") }}'
   OCM_VERSION: '{{ .OCM_VERSION | default "v0.21.0" }}'
-  ENVTEST: '{{ .ENVTEST | default (print .LOCALTMP "/setup-envtest") }}'
+  ENVTEST: '{{ .ENVTEST | default (print .LOCALBIN "/setup-envtest") }}'
   ENVTEST_VERSION: '{{ .ENVTEST_VERSION | default "release-0.16" }}'
 
   DOCKER_BUILDER_NAME: # move to build taskfile later
