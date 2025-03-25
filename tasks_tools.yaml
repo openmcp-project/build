@@ -33,9 +33,10 @@ tasks:
     requires:
       vars:
       - CONTROLLER_GEN
-      - CONTROLLER_GEN_VERSION
     deps:
     - localbin
+    vars:
+      CONTROLLER_GEN_VERSION: '{{ env "CONTROLLER_GEN_VERSION" | default ( .CONTROLLER_GEN_VERSION | default "v0.16.4" ) }}'
     status:
     - test -x {{.CONTROLLER_GEN}}
     - '{{.CONTROLLER_GEN}} --version | grep -q "{{.CONTROLLER_GEN_VERSION}}"'
@@ -49,9 +50,10 @@ tasks:
     requires:
       vars:
       - FORMATTER
-      - FORMATTER_VERSION
     deps:
     - localbin
+    vars:
+      FORMATTER_VERSION: '{{ env "FORMATTER_VERSION" | default ( .FORMATTER_VERSION | default "v0.26.0" ) }}'
     status:
     - test -x {{.FORMATTER}}
     - test -f {{.LOCALBIN}}/formatter_version
@@ -67,9 +69,10 @@ tasks:
     requires:
       vars:
       - LINTER
-      - LINTER_VERSION
     deps:
     - localbin
+    vars:
+      LINTER_VERSION: '{{ env "LINTER_VERSION" | default ( .LINTER_VERSION | default "v1.64.4" ) }}'
     status:
     - test -x {{.LINTER}}
     - '{{.LINTER}} --version | grep -q {{.LINTER_VERSION | trimPrefix "v"}}'
@@ -83,10 +86,10 @@ tasks:
     requires:
       vars:
       - JQ
-      - JQ_VERSION
     deps:
     - localbin
     vars:
+      JQ_VERSION: '{{ env "JQ_VERSION" | default ( .JQ_VERSION | default "v1.7.1" ) }}'
       JQ_OS:
         sh: 'if [[ "{{.OS}}" == "darwin" ]]; then echo "macos"; else echo "{{.OS}}"; fi' # jq uses 'macos' instead of 'darwin'
     status:
@@ -103,15 +106,15 @@ tasks:
     requires:
       vars:
       - HELM
-      - HELM_VERSION
     deps:
     - localbin
+    vars:
+      HELM_VERSION: '{{ env "HELM_VERSION" | default ( .HELM_VERSION | default "v3.17.1" ) }}'
+      tmpdir:
+        sh: 'mktemp -d'
     status:
     - test -x "{{.HELM}}"
     - '"{{.HELM}}" version --short | grep -q {{.HELM_VERSION}}'
-    vars:
-      tmpdir:
-        sh: 'mktemp -d'
     cmds:
     - 'mkdir -p {{.tmpdir}}/helm-unpacked'
     - 'curl -sfL "https://get.helm.sh/helm-{{.HELM_VERSION}}-{{.OS}}-{{.ARCH}}.tar.gz" --output "{{.tmpdir}}/helm.tar.gz"'
@@ -127,9 +130,10 @@ tasks:
     requires:
       vars:
       - YAML2JSON
-      - YAML2JSON_VERSION
     deps:
     - localbin
+    vars:
+      YAML2JSON_VERSION: '{{ env "YAML2JSON_VERSION" | default ( .YAML2JSON_VERSION | default "v1.3.5" ) }}'
     status:
     - 'test -x "{{.YAML2JSON}}"'
     - '"{{.YAML2JSON}}" --version | grep -q "{{.YAML2JSON_VERSION | trimPrefix "v"}}"'
@@ -144,13 +148,13 @@ tasks:
     requires:
       vars:
       - OCM
-      - OCM_VERSION
     deps:
     - localbin
     status:
     - 'test -x "{{.OCM}}"'
     - '"{{.OCM}}" --version | grep -q "{{.OCM_VERSION | trimPrefix "v"}}"'
     vars:
+      OCM_VERSION: '{{ env "OCM_VERSION" | default ( .OCM_VERSION | default "v0.21.0" ) }}'
       tmpdir:
         sh: 'mktemp -d'
     cmds:
@@ -164,9 +168,10 @@ tasks:
     requires:
       vars:
       - ENVTEST
-      - ENVTEST_VERSION
     deps:
     - localbin
+    vars:
+      ENVTEST_VERSION: '{{ env "ENVTEST_VERSION" | default ( .ENVTEST_VERSION | default "release-0.16" ) }}'
     status:
     - 'test -x "{{.ENVTEST}}"'
     - test -f {{.LOCALBIN}}/envtest_version

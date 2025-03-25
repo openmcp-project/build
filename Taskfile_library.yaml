@@ -42,27 +42,16 @@ vars:
     sh: 'cat "{{.ROOT_DIR2}}/go.mod" | grep "module " | sed "s/module //" | sed -E "s/[[:blank:]].*//"'
   NESTED_MODULES: '{{.NESTED_MODULES | default "" }}'
 
-  LOCALBIN: '{{ .LOCALBIN | default (print .ROOT_DIR2 "/bin") }}'
-  LOCALTMP: '{{ .LOCALTMP | default (print .ROOT_DIR2 "/tmp") }}'
+  LOCALBIN: '{{ env "LOCALBIN" | default ( .LOCALBIN | default (print .ROOT_DIR2 "/bin") ) }}'
+  LOCALTMP: '{{ env "LOCALTMP" | default ( .LOCALTMP | default (print .ROOT_DIR2 "/tmp") ) }}'
   CONTROLLER_GEN: '{{ .CONTROLLER_GEN | default (print .LOCALBIN "/controller-gen") }}'
-  CONTROLLER_GEN_VERSION: '{{ .CONTROLLER_GEN_VERSION | default "v0.16.4" }}'
   FORMATTER: '{{ .FORMATTER | default (print .LOCALBIN "/goimports") }}'
-  FORMATTER_VERSION: '{{ .FORMATTER_VERSION | default "v0.26.0" }}'
   LINTER: '{{ .LINTER | default (print .LOCALBIN "/golangci-lint") }}'
-  LINTER_VERSION: '{{ .LINTER_VERSION | default "v1.64.4" }}'
   JQ: '{{ .JQ | default (print .LOCALBIN "/jq") }}'
-  JQ_VERSION: '{{ .JQ_VERSION | default "v1.7.1" }}'
   HELM: '{{ .HELM | default (print .LOCALBIN "/helm") }}'
-  HELM_VERSION: '{{ .HELM_VERSION | default "v3.17.1" }}'
   YAML2JSON: '{{ .YAML2JSON | default (print .LOCALBIN "/yaml2json") }}'
-  YAML2JSON_VERSION: '{{ .YAML2JSON_VERSION | default "v1.3.5" }}'
   OCM: '{{ .OCM | default (print .LOCALBIN "/ocm") }}'
-  OCM_VERSION: '{{ .OCM_VERSION | default "v0.21.0" }}'
   ENVTEST: '{{ .ENVTEST | default (print .LOCALBIN "/setup-envtest") }}'
-  ENVTEST_VERSION: '{{ .ENVTEST_VERSION | default "release-0.16" }}'
-
-  DOCKER_BUILDER_NAME: # move to build taskfile later
-    sh: 'echo -n ${DOCKER_BUILDER_NAME:-"openmcp-multiarch-builder"}'
 
   # separator strings
   SEP_MSG: "This is just a separator, what did you expect to happen?"

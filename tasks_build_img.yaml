@@ -5,6 +5,10 @@ includes:
     taskfile: tasks_build_bin.yaml
     internal: true
 
+vars:
+  DOCKER_BUILDER_NAME:
+    sh: 'echo -n ${DOCKER_BUILDER_NAME:-"openmcp-multiarch-builder"}'
+
 tasks:
   # This is a dummy task that serves as a separator between task namespaces in the 'task -l' output.
   "---":
