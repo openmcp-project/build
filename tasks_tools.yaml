@@ -36,6 +36,7 @@ tasks:
     deps:
     - localbin
     vars:
+      # renovate: datasource=github-releases depName=controller-tools packageName=kubernetes-sigs/controller-tools
       CONTROLLER_GEN_VERSION: '{{ env "CONTROLLER_GEN_VERSION" | default ( .CONTROLLER_GEN_VERSION | default "v0.16.4" ) }}'
     status:
     - test -x {{.CONTROLLER_GEN}}
@@ -53,6 +54,7 @@ tasks:
     deps:
     - localbin
     vars:
+      # renovate: datasource=github-tags depName=tools packageName=golang/tools
       FORMATTER_VERSION: '{{ env "FORMATTER_VERSION" | default ( .FORMATTER_VERSION | default "v0.26.0" ) }}'
     status:
     - test -x {{.FORMATTER}}
@@ -72,6 +74,7 @@ tasks:
     deps:
     - localbin
     vars:
+      # renovate: datasource=github-releases depName=golangci-lint packageName=golangci/golangci-lint
       LINTER_VERSION: '{{ env "LINTER_VERSION" | default ( .LINTER_VERSION | default "v1.64.4" ) }}'
     status:
     - test -x {{.LINTER}}
@@ -89,6 +92,7 @@ tasks:
     deps:
     - localbin
     vars:
+      # renovate: datasource=github-releases depName=jq packageName=jqlang/jq
       JQ_VERSION: '{{ env "JQ_VERSION" | default ( .JQ_VERSION | default "v1.7.1" ) }}'
       JQ_OS:
         sh: 'if [[ "{{.OS}}" == "darwin" ]]; then echo "macos"; else echo "{{.OS}}"; fi' # jq uses 'macos' instead of 'darwin'
@@ -109,6 +113,7 @@ tasks:
     deps:
     - localbin
     vars:
+      # renovate: datasource=github-releases depName=helm packageName=helm/helm
       HELM_VERSION: '{{ env "HELM_VERSION" | default ( .HELM_VERSION | default "v3.17.1" ) }}'
       tmpdir:
         sh: 'mktemp -d'
@@ -133,6 +138,7 @@ tasks:
     deps:
     - localbin
     vars:
+      # renovate: datasource=github-releases depName=yaml2json packageName=bronze1man/yaml2json
       YAML2JSON_VERSION: '{{ env "YAML2JSON_VERSION" | default ( .YAML2JSON_VERSION | default "v1.3.5" ) }}'
     status:
     - 'test -x "{{.YAML2JSON}}"'
@@ -154,6 +160,7 @@ tasks:
     - 'test -x "{{.OCM}}"'
     - '"{{.OCM}}" --version | grep -q "{{.OCM_VERSION | trimPrefix "v"}}"'
     vars:
+      # renovate: datasource=github-releases depName=ocm packageName=open-component-model/ocm
       OCM_VERSION: '{{ env "OCM_VERSION" | default ( .OCM_VERSION | default "v0.21.0" ) }}'
       tmpdir:
         sh: 'mktemp -d'
