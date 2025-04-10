@@ -88,8 +88,6 @@ tasks:
     run: once
     requires:
       vars:
-      - COMPONENTS
-      - NESTED_MODULES
       - MODULE_NAME
     preconditions:
     - sh: 'test "{{len .CLI_ARGS}}" -gt 0'
