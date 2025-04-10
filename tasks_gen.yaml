@@ -68,7 +68,7 @@ tasks:
     - cmd: rm -rf {{.MANIFEST_OUT}}
     - for:
         var: API_DIRS
-      cmd: '{{.CONTROLLER_GEN}} crd paths={{.ITEM}} output:crd:artifacts:config={{.MANIFEST_OUT}}'
+      cmd: '{{.CONTROLLER_GEN}} crd:allowDangerousTypes=true paths={{.ITEM}} output:crd:artifacts:config={{.MANIFEST_OUT}}'
     internal: true
 
   code:
