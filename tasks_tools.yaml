@@ -55,7 +55,7 @@ tasks:
     - localbin
     vars:
       # renovate: datasource=github-tags depName=tools packageName=golang/tools
-      FORMATTER_VERSION: '{{ env "FORMATTER_VERSION" | default ( .FORMATTER_VERSION | default "v0.26.0" ) }}'
+      FORMATTER_VERSION: '{{ env "FORMATTER_VERSION" | default ( .FORMATTER_VERSION | default "v0.32.0" ) }}'
     status:
     - test -x {{.FORMATTER}}
     - test -f {{.LOCALBIN}}/formatter_version
