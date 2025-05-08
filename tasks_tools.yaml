@@ -179,6 +179,7 @@ tasks:
     - localbin
     vars:
       ENVTEST_VERSION: '{{ env "ENVTEST_VERSION" | default ( .ENVTEST_VERSION | default "release-0.16" ) }}'
+      ENVTEST_K8S_VERSION: '{{ env "ENVTEST_K8S_VERSION" | default ( .ENVTEST_K8S_VERSION | default "1.30.0"" ) }}'
     status:
     - 'test -x "{{.ENVTEST}}"'
     - test -f {{.LOCALBIN}}/envtest_version
@@ -186,4 +187,5 @@ tasks:
     cmds:
     - 'GOBIN="{{.LOCALBIN}}" go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.ENVTEST_VERSION}}'
     - echo -n "{{.ENVTEST_VERSION}}" > {{.LOCALBIN}}/envtest_version
+    - '{{.ROOT_DIR}}/bin/setup-envtest use {{.ENVTEST_K8S_VERSION}} -p path > {{.LOCALBIN}}/assets_path'
     internal: true
