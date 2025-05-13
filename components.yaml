@@ -41,17 +41,20 @@
 #   - Comma-separated list of components for which the blueprint should be added to the component descriptor, e.g. "apiserver-controller,managedcontrolplane-controller,landscaper-connector"
 #   - Each element will result in a resource entry of type 'landscaper.gardener.cloud/blueprint' named '<component>-blueprint'. The corresponding blueprint is expected at 'BP_PATH/<component>' (relative to this file).
 #   - Defaults to COMPONENTS if BP_PATH is set and is empty otherwise.
+#   - Set this to "[]" to not add any blueprints to the component descriptor.
 # - CHART_COMPONENTS
 #   - Comma-separated list of components for which helm charts should be referenced in the component descriptor, optionally with version (separated by ":").
 #   - Example: "apiserver-controller:v0.1.0,managedcontrolplane-controller:v0.2.0,landscaper-connector"
 #   - Each element will result in a resource entry of type 'helmChart' named '<component>-chart'. The chart is expected in the OCI registry at '<CHART_REGISTRY>/<component>:<version>'.
 #   - Defaults to COMPONENTS if not specified.
+#   - Set this to "[]" to not add any helm charts to the component descriptor.
 #   - Each chart's version defaults to CHART_VERSION if not specified.
 # - IMG_COMPONENTS
 #   - Comma-separated list of components for which container images should be referenced in the component descriptor, optionally with version (separated by ":").
 #   - Example: "apiserver-controller:v0.1.0,managedcontrolplane-controller:v0.2.0,landscaper-connector"
 #   - Each element will result in a resource entry of type 'ociImage' named '<component>-image'. The image is expected in the OCI registry at '<IMG_REGISTRY>/<component>:<version>'.
 #   - Defaults to COMPONENTS if not specified.
+#   - Set this to "[]" to not add any images to the component descriptor.
 #   - Each image's version defaults to IMG_VERSION if not specified.
 
 
@@ -70,9 +73,9 @@ sources:
     commit: (( values.COMMIT ))
     ref: (( contains(values.VERSION, "-dev") ? ~~ :"refs/tags/" values.VERSION ))
 resources:
-- <<<: (( sum[funcs.splitIgnoreEmpty(",", defaults.BP_COMPONENTS)|[]|s,comp|-> s *templates.blueprint] ))
-- <<<: (( sum[funcs.splitIgnoreEmpty(",", defaults.CHART_COMPONENTS)|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "chart_version" = (cvs[1] || defaults.CHART_VERSION)) s *templates.chart] ))
-- <<<: (( sum[funcs.splitIgnoreEmpty(",", defaults.IMG_COMPONENTS)|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "img_version" = (cvs[1] || defaults.IMG_VERSION)) s *templates.image] ))
+- <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.BP_COMPONENTS))|[]|s,comp|-> s *templates.blueprint] ))
+- <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.CHART_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "chart_version" = (cvs[1] || defaults.CHART_VERSION)) s *templates.chart] ))
+- <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.IMG_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "img_version" = (cvs[1] || defaults.IMG_VERSION)) s *templates.image] ))
 
 
 # ##########################################################################
@@ -91,6 +94,7 @@ funcs:
   <<<: (( &temporary ))
   notEmpty: (( |x|-> x != "" )) # returns true if the input is not an empty string
   splitIgnoreEmpty: (( |d,s|-> select[split(d, s)|x|-> x != ""] )) # splits a string by a delimiter and removes empty elements
+  ignoreDisabled: (( |x|-> x == "[]" ? "" :x )) # returns an empty string if the input is an empty array, otherwise returns the input as is
 
 templates:
   <<<: (( &temporary ))
