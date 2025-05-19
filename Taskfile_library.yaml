@@ -36,6 +36,8 @@ vars:
     sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-version.sh'
   OS:
     sh: echo ${OS:-$(go env GOOS)}
+  IMAGE_OS:
+    sh: echo ${IMAGE_OS:-linux}
   ARCH:
     sh: echo ${ARCH:-$(go env GOARCH)}
   MODULE_NAME:

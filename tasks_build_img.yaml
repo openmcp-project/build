@@ -30,27 +30,27 @@ tasks:
     internal: true
 
   build:
-    desc: "  Build the image for $OS/$ARCH."
+    desc: "  Build the image for $IMAGE_OS/$ARCH."
     summary: |
       This task builds the image for the current operating system and architecture.
-      To overwrite this, set the 'OS' and 'ARCH' environment variables.
+      To overwrite this, set the 'IMAGE_OS' and 'ARCH' environment variables.
       To overwrite the image's base path, set the 'IMAGE_REGISTRY' environment variable.
     deps:
     - task: build:bin:build
       vars:
-        OS: '{{.OS}}'
+        OS: '{{.IMAGE_OS}}'
         ARCH: '{{.ARCH}}'
     cmds:
     - task: build-raw
       vars:
-        OS: '{{.OS}}'
+        OS: '{{.IMAGE_OS}}'
         ARCH: '{{.ARCH}}'
 
   build-raw:
     desc: "  Build the image. Does not run the binary build before."
     summary: |
       This task builds the image for the current operating system and architecture.
-      To overwrite this, set the 'OS' and 'ARCH' environment variables.
+      To overwrite this, set the 'IMAGE_OS' and 'ARCH' environment variables.
       To overwrite the image's base path, set the 'IMAGE_REGISTRY' environment variable.
     requires:
       vars:
@@ -68,7 +68,7 @@ tasks:
       vars:
         COMPONENT: '{{.ITEM}}'
         IMAGE_BASE: '{{.IMAGE_BASE}}'
-        OS: '{{.OS}}'
+        OS: '{{.IMAGE_OS}}'
         ARCH: '{{.ARCH}}'
       task: build-internal
 
@@ -124,7 +124,7 @@ tasks:
     desc: "  Push the image. Image must have been built before."
     summary: |
       This task pushes the image for the current operating system and architecture.
-      To overwrite this, set the 'OS' and 'ARCH' environment variables.
+      To overwrite this, set the 'IMAGE_OS' and 'ARCH' environment variables.
       To overwrite the image's base path, set the 'IMAGE_REGISTRY' environment variable.
     requires:
       vars:
@@ -136,7 +136,7 @@ tasks:
         var: COMPONENTS
       vars:
         COMPONENT: '{{.ITEM}}'
-        OS: '{{.OS}}'
+        OS: '{{.IMAGE_OS}}'
         ARCH: '{{.ARCH}}'
       task: push-internal
 
