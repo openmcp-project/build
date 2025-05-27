@@ -37,7 +37,7 @@ tasks:
     - localbin
     vars:
       # renovate: datasource=github-releases depName=controller-tools packageName=kubernetes-sigs/controller-tools
-      CONTROLLER_GEN_VERSION: '{{ env "CONTROLLER_GEN_VERSION" | default ( .CONTROLLER_GEN_VERSION | default "v0.17.3" ) }}'
+      CONTROLLER_GEN_VERSION: '{{ env "CONTROLLER_GEN_VERSION" | default ( .CONTROLLER_GEN_VERSION | default "v0.18.0" ) }}'
     status:
     - test -x {{.CONTROLLER_GEN}}
     - '{{.CONTROLLER_GEN}} --version | grep -q "{{.CONTROLLER_GEN_VERSION}}"'
