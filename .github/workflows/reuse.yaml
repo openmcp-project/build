@@ -4,4 +4,4 @@ on: [push, pull_request]
 
 jobs: 
   test:
-    uses: ./reuse.yaml
+    uses: ./reuse.yaml@main
