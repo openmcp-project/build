@@ -1,0 +1,23 @@
+name: Validate Pull Request Content
+
+on:
+  workflow_call:
+  
+jobs:
+  validate-pr-content:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate PR content
+        run: |
+          PR_BODY=$(jq -r .pull_request.body "$GITHUB_EVENT_PATH")
+          echo "DEBUG: PR_BODY content is: $PR_BODY"
+          REQUIRED_SECTIONS=("\\*\\*What this PR does / why we need it\\*\\*:" "\\*\\*Release note\\*\\*:")
+
+          for SECTION in "${REQUIRED_SECTIONS[@]}"; do
+            echo "DEBUG: Checking for section: $SECTION"
+            if ! echo "$PR_BODY" | grep -qE "$SECTION"; then
+              echo "Pull request message is missing required section: $SECTION" >&2
+              exit 1
+            fi
+          done
