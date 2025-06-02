@@ -146,5 +146,5 @@ jobs:
           git config user.name "${{ env.AUTHOR_NAME }}"
           git config user.email "${{ env.AUTHOR_EMAIL }}"
           git add VERSION
-          git commit -m "Update VERSION to ${{ env.version }}-dev"
+          git commit -m "release: Update VERSION to ${{ env.version }}-dev"
           git push origin main
