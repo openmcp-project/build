@@ -4,4 +4,4 @@ on: [push, pull_request]
 
 jobs: 
   test:
-    uses: ./.github/workflows/reuse.yaml
+    uses: ./.github/workflows/reuse.lib.yaml
