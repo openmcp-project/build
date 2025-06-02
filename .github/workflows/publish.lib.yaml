@@ -2,6 +2,11 @@ name: Publish
 
 on:
   workflow_call:
+    inputs:
+      owner:
+        description: 'Owner of the repository'
+        required: true
+        type: string
 
 permissions:
   packages: write
@@ -21,6 +26,7 @@ jobs:
           # required
           app-id: 1312871
           private-key: ${{ secrets.OPENMCP_CI_APP_PRIVATE_KEY }}
+          owner: ${{ inputs.owner }}
 
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
