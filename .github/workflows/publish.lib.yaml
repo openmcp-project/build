@@ -2,6 +2,11 @@ name: Publish
 
 on:
   workflow_call:
+    inputs:
+      private-key:
+        description: 'Private key for creating the GitHub App token'
+        required: true
+        type: string
 
 permissions:
   packages: write
@@ -20,7 +25,7 @@ jobs:
         with:
           # required
           app-id: 1312871
-          private-key: ${{ secrets.OPENMCP_CI_APP_PRIVATE_KEY }}
+          private-key: ${{ inputs.private-key }}
 
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
