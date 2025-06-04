@@ -11,7 +11,15 @@ jobs:
       - name: Validate PR content
         run: |
           PR_BODY=$(jq -r .pull_request.body "$GITHUB_EVENT_PATH")
+          PR_USER=$(jq -r .pull_request.user.login "$GITHUB_EVENT_PATH")
           echo "DEBUG: PR_BODY content is: $PR_BODY"
+          echo "DEBUG: PR_USER is: $PR_USER"
+
+          if [ "$PR_USER" = "renovate" ]; then
+            echo "Validation skipped for user: $PR_USER"
+            exit 0
+          fi
+
           REQUIRED_SECTIONS=("\\*\\*What this PR does / why we need it\\*\\*:" "\\*\\*Release note\\*\\*:")
 
           for SECTION in "${REQUIRED_SECTIONS[@]}"; do
