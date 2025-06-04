@@ -77,21 +77,12 @@ jobs:
           git tag -a "${{ env.version }}" -m "Release ${{ env.version }}"
           git push origin "${{ env.version }}"
 
-      - name: Create Git tag for api submodule
-        if: ${{ env.SKIP != 'true' }}
-        run: |
-          AUTHOR_NAME=$(git log -1 --pretty=format:'%an')
-          AUTHOR_EMAIL=$(git log -1 --pretty=format:'%ae')
-          echo "Tagging as $AUTHOR_NAME <$AUTHOR_EMAIL>"
+          NESTED_GO_MODULES="$(task release:list-nested-modules)"
 
-          echo "AUTHOR_NAME=$AUTHOR_NAME" >> $GITHUB_ENV
-          echo "AUTHOR_EMAIL=$AUTHOR_EMAIL" >> $GITHUB_ENV
-
-          git config user.name "$AUTHOR_NAME"
-          git config user.email "$AUTHOR_EMAIL"
-
-          git tag -a "api/${{ env.version }}" -m "Release ${{ env.version }}"
-          git push origin "api/${{ env.version }}"
+          for MODULE in $NESTED_GO_MODULES; do
+            git tag -a "${{MODULE}}/${{ env.version }}" -m "Release ${{ env.version }}"
+            git push origin "${{MODULE}}/${{ env.version }}"
+          done
 
       - name: Build Changelog
         id: github_release
