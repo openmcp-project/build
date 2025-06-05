@@ -80,8 +80,8 @@ jobs:
           NESTED_GO_MODULES="$(task release:list-nested-modules)"
 
           for MODULE in $NESTED_GO_MODULES; do
-            git tag -a "${{MODULE}}/${{ env.version }}" -m "Release ${{ env.version }}"
-            git push origin "${{MODULE}}/${{ env.version }}"
+            git tag -a "${MODULE}/${{ env.version }}" -m "Release ${{ env.version }}"
+            git push origin "${MODULE}/${{ env.version }}"
           done
 
       - name: Build Changelog
