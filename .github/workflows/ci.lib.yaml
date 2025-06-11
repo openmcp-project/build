@@ -26,6 +26,28 @@ jobs:
       - name: task generate
         run: |
           task generate --verbose
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            PR_USER=$(jq -r .pull_request.user.login "$GITHUB_EVENT_PATH")
+            if [ "$PR_USER" = "renovate[bot]" ]; then
+              echo "attempting to commit generated files"
+
+              AUTHOR_NAME=$(git log -1 --pretty=format:'%an')
+              AUTHOR_EMAIL=$(git log -1 --pretty=format:'%ae')
+              echo "Committing as $AUTHOR_NAME <$AUTHOR_EMAIL>"
+
+              echo "AUTHOR_NAME=$AUTHOR_NAME" >> $GITHUB_ENV
+              echo "AUTHOR_EMAIL=$AUTHOR_EMAIL" >> $GITHUB_ENV
+
+              git config user.name "$AUTHOR_NAME"
+              git config user.email "$AUTHOR_EMAIL"
+
+              git add -A
+              git commit -m "chore: regenerate files" || echo "No changes to commit"
+              git push origin "${{ github.head_ref }}" || echo "No changes to push"
+            fi
+          fi
+
           git diff --exit-code
 
       - name: task validate
