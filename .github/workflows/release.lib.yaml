@@ -28,6 +28,8 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: test-action
+        run: cd hack/common; git status
       - name: Install Task
         uses: arduino/setup-task@v2
         with:
@@ -85,36 +87,8 @@ jobs:
           done
 
       - name: Build Changelog
-        id: github_release
-        uses: mikepenz/release-changelog-builder-action@5fb6e51e44d4aea73f66549f425aa3ed5008109e # v5
-        with:
-          mode: "PR"
-          configurationJson: |
-            {
-              "template": "#{{CHANGELOG}}",
-              "pr_template": "- #{{TITLE}}: ##{{NUMBER}}",
-              "categories": [
-                {
-                    "title": "## Feature",
-                    "labels": ["feat", "feature"]
-                },
-                {
-                    "title": "## Fix",
-                    "labels": ["fix", "bug"]
-                },
-                {
-                    "title": "## Other",
-                    "labels": []
-                }
-              ],
-              "label_extractor": [
-                {
-                  "pattern": "^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\\([\\w\\-\\.]+\\))?(!)?: ([\\w ])+([\\s\\S]*)",
-                  "on_property": "title",
-                  "target": "$1"
-                }
-              ]
-            }
+        id: github_release  
+        run: task r:generate-changelog
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -124,7 +98,7 @@ jobs:
         with:
           tag_name: ${{ env.version }}
           name: Release ${{ env.version }}
-          body: ${{steps.github_release.outputs.changelog}}
+          body: CHANGELOG.md
           draft: true
           prerelease: false
         env:

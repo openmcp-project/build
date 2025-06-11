@@ -139,3 +139,13 @@ tasks:
     desc: "List all nested modules in the project."
     cmds:
       - cmd: 'echo "{{.NESTED_MODULES}}"'
+
+  generate-changelog:
+    desc: "  Generates an automated release changelog based on conventional-commits PR titles in CHANGELOG.md file."
+    run: once
+    requires:
+      vars:
+      - VERSION
+    cmds:
+    -  'VERSION={{.VERSION}} {{.TASKFILE_DIR2}}/generate-changelog.sh'
+      
