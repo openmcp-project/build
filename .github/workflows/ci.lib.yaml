@@ -13,6 +13,12 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Checkout pull request branch
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          git fetch origin ${{ github.event.pull_request.head.ref }}:$GITHUB_HEAD_REF
+          git checkout $GITHUB_HEAD_REF
+
       - name: Set up Go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
