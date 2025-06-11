@@ -3,32 +3,15 @@ name: CI
 on:
   workflow_call:
 
-permissions:
-  contents: write # we need this to be able to push to the pull request
-
 jobs:
   build:
     runs-on: ubuntu-24.04
 
     steps:
-      - name: Create GitHub App token
-        uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e # v2
-        id: app-token
-        with:
-          # required
-          app-id: 1312871
-          private-key: ${{ secrets.OPENMCP_CI_APP_PRIVATE_KEY }}
-          
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           submodules: recursive
-
-      - name: Checkout pull request branch
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          git fetch origin ${{ github.event.pull_request.head.ref }}:$GITHUB_HEAD_REF
-          git checkout $GITHUB_HEAD_REF
 
       - name: Set up Go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
@@ -43,28 +26,6 @@ jobs:
       - name: task generate
         run: |
           task generate --verbose
-
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            PR_USER=$(jq -r .pull_request.user.login "$GITHUB_EVENT_PATH")
-            if [ "$PR_USER" = "renovate[bot]" ]; then
-              echo "attempting to commit generated files"
-
-              AUTHOR_NAME=$(git log -1 --pretty=format:'%an')
-              AUTHOR_EMAIL=$(git log -1 --pretty=format:'%ae')
-              echo "Committing as $AUTHOR_NAME <$AUTHOR_EMAIL>"
-
-              echo "AUTHOR_NAME=$AUTHOR_NAME" >> $GITHUB_ENV
-              echo "AUTHOR_EMAIL=$AUTHOR_EMAIL" >> $GITHUB_ENV
-
-              git config user.name "$AUTHOR_NAME"
-              git config user.email "$AUTHOR_EMAIL"
-
-              git add -A
-              git commit -m "chore: regenerate files" || echo "No changes to commit"
-              git push origin "${{ github.head_ref }}" || echo "No changes to push"
-            fi
-          fi
-
           git diff --exit-code
 
       - name: task validate
