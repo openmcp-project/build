@@ -98,7 +98,7 @@ jobs:
         with:
           tag_name: ${{ env.version }}
           name: Release ${{ env.version }}
-          body: CHANGELOG.md
+          body_path: ./CHANGELOG.md
           draft: true
           prerelease: false
         env:
