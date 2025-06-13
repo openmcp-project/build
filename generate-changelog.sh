@@ -57,11 +57,11 @@ for PR_NUMBER in $PR_COMMITS; do
   CLEAN_TITLE=$(echo "$TITLE" | sed -E 's/^[a-z]+(\([^)]+\))?(!)?:[[:space:]]+//')
 
   # Extract release note block, we only extract the "user" related notes.
-  RELEASE_NOTE=$(echo "$BODY" | awk '/^```[[:space:]]*(breaking|feature|bugfix|doc|other)[[:space:]]+user[[:space:]]*$/ {flag=1; next} /^```[[:space:]]*$/ {flag=0} flag' || true)
-
+  RELEASE_NOTE=$(echo "$BODY" | awk '/^```[[:space:]]*(breaking|feature|bugfix|doc|other)[[:space:]]+user[[:space:]]*$/ {flag=1; next} /^```[[:space:]]*$/ {flag=0} flag' | grep -v  'NONE' || true)
   # Format entry
   ENTRY="- $CLEAN_TITLE [#${PR_NUMBER}](${URL})"
-  if [[ -n "$RELEASE_NOTE"  || "$RELEASE_NOTE" != "NONE" ]]; then
+
+  if [[ -n "$RELEASE_NOTE" ]]; then
     ENTRY+=": $RELEASE_NOTE"
   else
     ENTRY+="."
