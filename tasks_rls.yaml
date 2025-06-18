@@ -133,6 +133,27 @@ tasks:
       - MODULE_NAME
     cmds:
     - '{{.TASKFILE_DIR2}}/sed.sh -E "s@	{{.MODULE_NAME}}/{{.MODULE}} .*@	{{.MODULE_NAME}}/{{.MODULE}} {{.VERSION}}@" "{{.ROOT_DIR2}}/go.mod"'
+    - for:
+        var: NESTED_MODULES
+      vars:
+        MODULE_TO_UPDATE: '{{.MODULE}}'
+        MODULE_DEPENDENCY: '{{.ITEM}}'
+        VERSION: '{{.VERSION}}'
+        MODULE_NAME: '{{.MODULE_NAME}}'
+      task: set-nested-module-version-internal
+    internal: true
+
+  set-nested-module-version-internal:
+    desc:  "  Sets the imported version of a nested module in a nested go.mod file."
+    run: always
+    requires:
+      vars:
+      - MODULE_TO_UPDATE
+      - MODULE_DEPENDENCY
+      - VERSION
+      - MODULE_NAME
+    cmds:
+    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@	{{.MODULE_NAME}}/{{.MODULE_DEPENDENCY}} .*@	{{.MODULE_NAME}}/{{.MODULE_DEPENDENCY}} {{.VERSION}}@" "{{.ROOT_DIR2}}/{{.MODULE_TO_UPDATE}}/go.mod"'
     internal: true
 
   list-nested-modules:
@@ -148,4 +169,3 @@ tasks:
       - VERSION
     cmds:
     -  'VERSION={{.VERSION}} {{.TASKFILE_DIR2}}/generate-changelog.sh'
-      
