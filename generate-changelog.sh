@@ -15,7 +15,8 @@ if [[ -z "$LATEST_RELEASE_TAG" ]]; then # first release?
   LATEST_RELEASE_TAG=$(git rev-list --max-parents=0 HEAD) # first commit in the branch.
 fi
 
-PR_COMMITS=$(git log "$LATEST_RELEASE_TAG"..HEAD --oneline --pretty=format:"%s" main | grep -oE "#[0-9]+" | tr -d '#' | sort -u || true)
+GIT_LOG_OUTPUT=$(git log "$LATEST_RELEASE_TAG"..HEAD --oneline --pretty=format:"%s" main)
+PR_COMMITS=$(echo "$GIT_LOG_OUTPUT" | grep -oE "#[0-9]+" || true | tr -d '#' | sort -u)
 
 CHANGELOG_FILE=./CHANGELOG.md
 # File header Header
