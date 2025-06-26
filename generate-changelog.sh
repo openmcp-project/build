@@ -11,11 +11,11 @@ fi
 cd $(dirname "$0")/../../
 
 LATEST_RELEASE_TAG=$(gh release list --json tagName,isLatest --jq '.[] | select(.isLatest)|.tagName')
-if [[ -e $LATEST_RELEASE_TAG ]]; then # first release?
+if [[ -z "$LATEST_RELEASE_TAG" ]]; then # first release?
   LATEST_RELEASE_TAG=$(git rev-list --max-parents=0 HEAD) # first commit in the branch.
 fi
 
-PR_COMMITS=$(git log "$LATEST_RELEASE_TAG"..HEAD --oneline --pretty=format:"%s" main | grep -oE "#[0-9]+" | tr -d '#' | sort -u)
+PR_COMMITS=$(git log "$LATEST_RELEASE_TAG"..HEAD --oneline --pretty=format:"%s" | grep -oE "#[0-9]+" | tr -d '#' | sort -u || true)
 
 CHANGELOG_FILE=./CHANGELOG.md
 # File header Header
