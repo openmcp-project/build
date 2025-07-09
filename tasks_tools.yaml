@@ -114,7 +114,7 @@ tasks:
     - localbin
     vars:
       # renovate: datasource=github-releases depName=helm packageName=helm/helm
-      HELM_VERSION: '{{ env "HELM_VERSION" | default ( .HELM_VERSION | default "v3.18.2" ) }}'
+      HELM_VERSION: '{{ env "HELM_VERSION" | default ( .HELM_VERSION | default "v3.18.4" ) }}'
       tmpdir:
         sh: 'mktemp -d'
     status:
