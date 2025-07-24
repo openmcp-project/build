@@ -49,23 +49,30 @@ for PR_NUMBER in $PR_COMMITS; do
     continue
   fi
 
-  TITLE=$(echo "$PR_JSON" | jq -r '.title')
-  URL=$(echo "$PR_JSON" | jq -r '.url')
-  BODY=$(echo "$PR_JSON" | jq -r '.body')
+  PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
+  PR_URL=$(echo "$PR_JSON" | jq -r '.url')
+  PR_BODY=$(echo "$PR_JSON" | jq -r '.body')
 
   # Determine type from conventional commit (assumes title like "type(scope): message" or "type: message")
-  TYPE=$(echo "$TITLE" | grep -oE '^[a-z]+' || echo "feat")
-  CLEAN_TITLE=$(echo "$TITLE" | sed -E 's/^[a-z]+(\([^)]+\))?(!)?:[[:space:]]+//')
+  TYPE=$(echo "$PR_TITLE" | grep -oE '^[a-z]+' || echo "feat")
+  CLEAN_TITLE=$(echo "$PR_TITLE" | sed -E 's/^[a-z]+(\([^)]+\))?(!)?:[[:space:]]+//')
 
-  # Extract release note block, we only extract the "user" related notes.
-  RELEASE_NOTE=$(echo "$BODY" | awk '/^```[[:space:]]*(breaking|feature|bugfix|doc|other)[[:space:]]+user[[:space:]]*$/ {flag=1; next} /^```[[:space:]]*$/ {flag=0} flag' | grep -v  'NONE' || true)
+  # Extract release note block, this contains the release notes and the release notes headers.
+  RELEASE_NOTE_BLOCK=$(echo "$PR_BODY" | sed -n '/\*\*Release note\*\*:/,$p' | sed -n '/^```.*$/,/^```$/p')
+  # Extract release notes body
+  RELEASE_NOTE=$(echo "$RELEASE_NOTE_BLOCK" | sed '1d;$d' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
   # Format entry
-  ENTRY="- $CLEAN_TITLE [#${PR_NUMBER}](${URL})"
+  ENTRY="- $CLEAN_TITLE [#${PR_NUMBER}](${PR_URL})"
 
-  if [[ -n "$RELEASE_NOTE" ]]; then
-    ENTRY+=": $RELEASE_NOTE"
-  else
+  if [[ -z "$RELEASE_NOTE"  || "$RELEASE_NOTE" == "NONE" ]]; then
     ENTRY+="."
+  else
+    # Extract and format the release note headers.
+    HEADERS=$(echo "$PR_BODY" | sed -n '/\*\*Release note\*\*:/,$p' | sed -n '/^```.*$/,/^```$/p'| head -n 1 | sed 's/^```//')
+    FORMATED_HEADERS=$(echo "$HEADERS" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s/\s\+/ /g' | sed 's/\(\S\+\)/[\1]/g')
+
+    ENTRY="- ${FORMATED_HEADERS} ${CLEAN_TITLE} [#${PR_NUMBER}](${PR_URL}): ${RELEASE_NOTE}"
   fi
   ENTRY+="\n"
 
