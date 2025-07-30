@@ -161,7 +161,7 @@ tasks:
     - '"{{.OCM}}" --version | grep -q "{{.OCM_VERSION | trimPrefix "v"}}"'
     vars:
       # renovate: datasource=github-releases depName=ocm packageName=open-component-model/ocm
-      OCM_VERSION: '{{ env "OCM_VERSION" | default ( .OCM_VERSION | default "v0.26.0" ) }}'
+      OCM_VERSION: '{{ env "OCM_VERSION" | default ( .OCM_VERSION | default "v0.27.0" ) }}'
       tmpdir:
         sh: 'mktemp -d'
     cmds:
