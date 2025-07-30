@@ -82,10 +82,11 @@ tasks:
       - ARCH
       - IMAGE_BASE
       - DOCKER_BUILDER_NAME
+      - DOCKERFILE
     cmds:
     - 'echo "Building image {{.COMPONENT}}:{{.VERSION}}-{{.OS}}-{{.ARCH}}"'
     - '[[ "{{.OS}}" == "linux" ]] || { echo "The distroless base image does only support linux as operating system."; exit 1; }'
-    - 'cat "{{.TASKFILE_DIR2}}/Dockerfile" | sed "s/<component>/{{.COMPONENT}}/g" > "{{.ROOT_DIR2}}/Dockerfile.tmp"'
+    - 'cat "{{.DOCKERFILE}}" | sed "s/<component>/{{.COMPONENT}}/g" > "{{.ROOT_DIR2}}/Dockerfile.tmp"'
     - '( cd "{{.ROOT_DIR2}}"; docker buildx build --builder {{.DOCKER_BUILDER_NAME}} --load --build-arg COMPONENT={{.COMPONENT}} --platform {{.OS}}/{{.ARCH}} -t {{.IMAGE_BASE}}/{{.COMPONENT}}:{{.VERSION}}-{{.OS}}-{{.ARCH}} -f Dockerfile.tmp . )'
     - 'rm -f "{{.ROOT_DIR2}}/Dockerfile.tmp"'
     internal: true
