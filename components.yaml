@@ -75,6 +75,7 @@ resources:
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.BP_COMPONENTS))|[]|s,comp|-> s *templates.blueprint] ))
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.CHART_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "chart_version" = (cvs[1] || defaults.CHART_VERSION)) s *templates.chart] ))
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.IMG_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "img_version" = (cvs[1] || defaults.IMG_VERSION)) s *templates.image] ))
+- <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.CRDS_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "crds_version" = (cvs[1] || defaults.CRDS_VERSION)) s *templates.image] ))
 
 
 # ##########################################################################
@@ -88,6 +89,7 @@ defaults:
   BP_COMPONENTS: (( funcs.notEmpty(values.BP_PATH || "") ? ( funcs.notEmpty(values.BP_COMPONENTS || "") ? values.BP_COMPONENTS :values.COMPONENTS ) :"" ))
   CHART_COMPONENTS: (( funcs.notEmpty(values.CHART_COMPONENTS || "") ? values.CHART_COMPONENTS :values.COMPONENTS ))
   IMG_COMPONENTS: (( funcs.notEmpty(values.IMG_COMPONENTS || "") ? values.IMG_COMPONENTS :values.COMPONENTS ))
+  CRDS_COMPONENTS: (( funcs.notEmpty(values.CRDS_COMPONENTS || "") ? values.CRDS_COMPONENTS :values.COMPONENTS ))
 
 funcs:
   <<<: (( &temporary ))
@@ -120,6 +122,14 @@ templates:
     access:
       imageReference: (( values.IMG_REGISTRY "/" comp ":" img_version ))
       type: ociArtifact
+  crds:
+    <<<: (( &template ))
+    name: (( comp "-crds" ))
+    type: fileSystem
+    version: (( crds_version ))
+    input:
+      type: dir
+      path: (( values.CRDS_PATH ))
 
 
 
