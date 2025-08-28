@@ -75,7 +75,7 @@ resources:
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.BP_COMPONENTS))|[]|s,comp|-> s *templates.blueprint] ))
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.CHART_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "chart_version" = (cvs[1] || defaults.CHART_VERSION)) s *templates.chart] ))
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.IMG_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "img_version" = (cvs[1] || defaults.IMG_VERSION)) s *templates.image] ))
-- <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.CRDS_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "crds_version" = (cvs[1] || defaults.CRDS_VERSION)) s *templates.image] ))
+- <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.CRDS_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "crds_version" = (cvs[1] || defaults.CRDS_VERSION)) s *templates.crds] ))
 
 
 # ##########################################################################
