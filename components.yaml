@@ -90,6 +90,7 @@ defaults:
   CHART_COMPONENTS: (( funcs.notEmpty(values.CHART_COMPONENTS || "") ? values.CHART_COMPONENTS :values.COMPONENTS ))
   IMG_COMPONENTS: (( funcs.notEmpty(values.IMG_COMPONENTS || "") ? values.IMG_COMPONENTS :values.COMPONENTS ))
   CRDS_COMPONENTS: (( funcs.notEmpty(values.CRDS_COMPONENTS || "") ? values.CRDS_COMPONENTS :values.COMPONENTS ))
+  CRDS_VERSION: (( funcs.notEmpty(values.CRDS_VERSION || "") ? values.CRDS_VERSION :values.VERSION ))
 
 funcs:
   <<<: (( &temporary ))
