@@ -55,7 +55,10 @@ tasks:
         IMG_VERSION="{{.IMG_VERSION | default ""}}" \
         BP_COMPONENTS="{{.BP_COMPONENTS | default ""}}" \
         CHART_COMPONENTS="{{.CHART_COMPONENTS | default ""}}" \
-        IMG_COMPONENTS="{{.IMG_COMPONENTS | default ""}}"
+        IMG_COMPONENTS="{{.IMG_COMPONENTS | default ""}}" \
+        CRDS_COMPONENTS="{{.CRDS_COMPONENTS | default "[]"}}" \
+        CRDS_VERSION="{{.CRDS_VERSION | default ""}}" \
+        CRDS_PATH="{{.CRDS_PATH | default ""}}"
     - cmd: echo "Use '$(realpath --relative-base="{{.USER_WORKING_DIR}}" "{{.OCM}}") get cv $(realpath --relative-base="{{.USER_WORKING_DIR}}" "{{.compdir}}") -o yaml' to view the generated component descriptor."
       silent: true
 
