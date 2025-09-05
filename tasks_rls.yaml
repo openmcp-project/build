@@ -132,7 +132,7 @@ tasks:
       - MODULE
       - MODULE_NAME
     cmds:
-    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@	{{.MODULE_NAME}}/{{.MODULE}} .*@	{{.MODULE_NAME}}/{{.MODULE}} {{.VERSION}}@" "{{.ROOT_DIR2}}/go.mod"'
+    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@	{{.MODULE_NAME}}/{{.MODULE}} v.*@	{{.MODULE_NAME}}/{{.MODULE}} {{.VERSION}}@" "{{.ROOT_DIR2}}/go.mod"'
     - for:
         var: NESTED_MODULES
       vars:
@@ -153,7 +153,7 @@ tasks:
       - VERSION
       - MODULE_NAME
     cmds:
-    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@	{{.MODULE_NAME}}/{{.MODULE_DEPENDENCY}} .*@	{{.MODULE_NAME}}/{{.MODULE_DEPENDENCY}} {{.VERSION}}@" "{{.ROOT_DIR2}}/{{.MODULE_TO_UPDATE}}/go.mod"'
+    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@	{{.MODULE_NAME}}/{{.MODULE_DEPENDENCY}} v.*@	{{.MODULE_NAME}}/{{.MODULE_DEPENDENCY}} {{.VERSION}}@" "{{.ROOT_DIR2}}/{{.MODULE_TO_UPDATE}}/go.mod"'
     internal: true
 
   list-nested-modules:
