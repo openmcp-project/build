@@ -82,7 +82,7 @@ for PR_NUMBER in $PR_COMMITS; do
       NOTE_TYPE=$(jq -r '.type' <<< "$note" | tr '[:lower:]' '[:upper:]')
       NOTE_AUDIENCE=$(jq -r '.audience' <<< "$note" | tr '[:lower:]' '[:upper:]')
       NOTE_BODY=$(jq -r '.body' <<< "$note")
-      echo -en "\n  - **[$NOTE_AUDIENCE][$NOTE_TYPE]** $NOTE_BODY"
+      echo -en "\n  - **[$NOTE_AUDIENCE][$NOTE_TYPE]** ${NOTE_BODY//'\n'/'\n    '}" # the parameter expansion is required to fix the indentation
     done
   )"
 
