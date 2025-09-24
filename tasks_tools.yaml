@@ -75,7 +75,7 @@ tasks:
     - localbin
     vars:
       # renovate: datasource=github-releases depName=golangci-lint packageName=golangci/golangci-lint
-      LINTER_VERSION: '{{ env "LINTER_VERSION" | default ( .LINTER_VERSION | default "v2.4.0" ) }}'
+      LINTER_VERSION: '{{ env "LINTER_VERSION" | default ( .LINTER_VERSION | default "v2.5.0" ) }}'
     status:
     - test -x {{.LINTER}}
     - '{{.LINTER}} --version | grep -q {{.LINTER_VERSION | trimPrefix "v"}}'
