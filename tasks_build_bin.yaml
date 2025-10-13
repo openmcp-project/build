@@ -49,11 +49,15 @@ tasks:
       - COMPONENTS
       - OS
       - ARCH
+      - VERSION
+      - GIT_TREE_STATE
+      - GIT_COMMIT
+      - BUILD_DATE
     cmds:
     - for:
         var: COMPONENTS
         as: COMPONENT
-      cmd: 'CGO_ENABLED=0 GOOS={{.OS}} GOARCH={{.ARCH}} go build -a -o {{.ROOT_DIR2}}/bin/{{.COMPONENT}}.{{.OS}}-{{.ARCH}} {{.ROOT_DIR2}}/cmd/{{.COMPONENT}}/main.go'
+      cmd: 'CGO_ENABLED=0 GOOS={{.OS}} GOARCH={{.ARCH}} go build -a -ldflags="openmcp.cloud/buildVersion={{.VERSION}} openmcp.cloud/gitTreeState={{.GIT_TREE_STATE}} openmcp.cloud/gitCommit={{.GIT_COMMIT}} openmcp.cloud/buildDate={{.BUILD_DATE}}" -o {{.ROOT_DIR2}}/bin/{{.COMPONENT}}.{{.OS}}-{{.ARCH}} {{.ROOT_DIR2}}/cmd/{{.COMPONENT}}/main.go'
 
   build-multi-raw:
     desc: "  Build multi-platform binaries. Skips code generation/validation tasks."
