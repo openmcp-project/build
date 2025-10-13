@@ -39,7 +39,7 @@ vars:
   GIT_COMMIT:
     sh: 'git rev-parse --verify HEAD || echo "unknown"'
   BUILD_DATE:
-    sh: 'date -u +%Y-%m-%dT%H:%M:%SZ'
+    sh: 'date -u +%Y-%m-%dT%H:%M:%SZ || echo "unknown"'
   OS:
     sh: echo ${OS:-$(go env GOOS)}
   IMAGE_OS:
