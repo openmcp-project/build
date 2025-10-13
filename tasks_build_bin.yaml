@@ -53,11 +53,12 @@ tasks:
       - GIT_TREE_STATE
       - GIT_COMMIT
       - BUILD_DATE
+      - MODULE_NAME
     cmds:
     - for:
         var: COMPONENTS
         as: COMPONENT
-      cmd: 'CGO_ENABLED=0 GOOS={{.OS}} GOARCH={{.ARCH}} go build -a -ldflags="-X main.BuildVersion={{.VERSION}} -X main.GitTreeState={{.GIT_TREE_STATE}} -X main.GitCommit={{.GIT_COMMIT}} -X main.BuildDate={{.BUILD_DATE}}" -o {{.ROOT_DIR2}}/bin/{{.COMPONENT}}.{{.OS}}-{{.ARCH}} {{.ROOT_DIR2}}/cmd/{{.COMPONENT}}/main.go'
+      cmd: 'CGO_ENABLED=0 GOOS={{.OS}} GOARCH={{.ARCH}} go build -a -ldflags="-X {{.MODULE_NAME}}.BuildVersion={{.VERSION}} -X {{.MODULE_NAME}}.GitTreeState={{.GIT_TREE_STATE}} -X {{.MODULE_NAME}}.GitCommit={{.GIT_COMMIT}} -X {{.MODULE_NAME}}.BuildDate={{.BUILD_DATE}}" -o {{.ROOT_DIR2}}/bin/{{.COMPONENT}}.{{.OS}}-{{.ARCH}} {{.ROOT_DIR2}}/cmd/{{.COMPONENT}}/main.go'
 
   build-multi-raw:
     desc: "  Build multi-platform binaries. Skips code generation/validation tasks."
