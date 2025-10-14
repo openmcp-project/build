@@ -34,6 +34,12 @@ vars:
 
   VERSION:
     sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-version.sh'
+  GIT_TREE_STATE:
+    sh: 'git diff --quiet && echo "clean" || echo "dirty"'
+  GIT_COMMIT:
+    sh: 'git rev-parse --verify HEAD || echo "unknown"'
+  BUILD_DATE:
+    sh: 'date -u +%Y-%m-%dT%H:%M:%SZ || echo "unknown"'
   OS:
     sh: echo ${OS:-$(go env GOOS)}
   IMAGE_OS:
@@ -44,6 +50,7 @@ vars:
     sh: 'cat "{{.ROOT_DIR2}}/go.mod" | grep "module " | sed "s/module //" | sed -E "s/[[:blank:]].*//"'
   NESTED_MODULES: '{{.NESTED_MODULES | default "" }}'
   DOCKERFILE: '{{.DOCKERFILE | default (print .TASKFILE_DIR2 "/Dockerfile") }}'
+
 
   LOCALBIN: '{{ env "LOCALBIN" | default ( .LOCALBIN | default (print .ROOT_DIR2 "/bin") ) }}'
   LOCALTMP: '{{ env "LOCALTMP" | default ( .LOCALTMP | default (print .ROOT_DIR2 "/tmp") ) }}'
