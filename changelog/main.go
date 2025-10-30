@@ -35,12 +35,12 @@ func main() {
 	}
 
 	sections := NewSections().
-		WithSection("breaking", "🚨 Breaking", nil).
-		WithSection("feature", "🚀 Features", nil).
-		WithSection("bugfix", "🐛 Bugfixes", nil).
-		WithSection("refactor", "🛠️ Refactorings", nil).
-		WithSection("doc", "📚 Documentation", nil).
-		WithSection("chore", "🔧 Chores", nil)
+		WithSection("breaking", "🚨 Breaking").
+		WithSection("feature", "🚀 Features").
+		WithSection("bugfix", "🐛 Bugfixes").
+		WithSection("refactor", "🛠️ Refactorings").
+		WithSection("doc", "📚 Documentation").
+		WithSection("chore", "🔧 Chores")
 
 	for _, pr := range prs {
 		prNotes := pr.ExtractReleaseNotes()
@@ -74,18 +74,6 @@ type Sections struct {
 }
 
 type Section struct {
-	ID          string
-	Title       string
-	Notes       []ReleaseNote
-	Subsections *Subsections
-}
-
-type Subsections struct {
-	CustomSubsections map[string]*Subsection
-	Other             *Subsection
-}
-
-type Subsection struct {
 	ID    string
 	Title string
 	Notes []ReleaseNote
@@ -102,46 +90,26 @@ type ReleaseNote struct {
 func NewSections() *Sections {
 	ss := &Sections{
 		CustomSections: map[string]*Section{},
-		Other:          NewSection(SectionKeyOther, "➕ Other", nil),
+		Other:          NewSection(SectionKeyOther, "➕ Other"),
 		IterationOrder: []string{},
 	}
 	return ss
 }
 
-func (ss *Sections) WithSection(id, title string, subsections map[string]string) *Sections {
-	section := NewSection(id, title, subsections)
+func (ss *Sections) WithSection(id, title string) *Sections {
+	section := NewSection(id, title)
 	ss.CustomSections[id] = section
 	ss.IterationOrder = append(ss.IterationOrder, id)
 	return ss
 }
 
-func NewSection(id, title string, subsections map[string]string) *Section {
+func NewSection(id, title string) *Section {
 	section := &Section{
-		ID:          id,
-		Title:       title,
-		Notes:       []ReleaseNote{},
-		Subsections: NewSubsections(subsections),
-	}
-	return section
-}
-
-func NewSubsections(subsections map[string]string) *Subsections {
-	ss := &Subsections{
-		CustomSubsections: map[string]*Subsection{},
-		Other:             NewSubsection(SubsectionKeyOther, "➕ Other"),
-	}
-	for key, title := range subsections {
-		ss.CustomSubsections[key] = NewSubsection(key, title)
-	}
-	return ss
-}
-
-func NewSubsection(id, title string) *Subsection {
-	return &Subsection{
 		ID:    id,
 		Title: title,
 		Notes: []ReleaseNote{},
 	}
+	return section
 }
 
 func (ss Sections) Add(note ReleaseNote) {
@@ -149,16 +117,7 @@ func (ss Sections) Add(note ReleaseNote) {
 	if !ok {
 		section = ss.Other
 	}
-	var subsection *Subsection
-	if note.Subtype != "" {
-		subsection, ok = section.Subsections.CustomSubsections[note.Subtype]
-		if !ok {
-			subsection = section.Subsections.Other
-		}
-		subsection.Notes = append(subsection.Notes, note)
-	} else {
-		section.Notes = append(section.Notes, note)
-	}
+	section.Notes = append(section.Notes, note)
 }
 
 func (pri *PRInfo) ExtractReleaseNotes() []ReleaseNote {
@@ -194,7 +153,7 @@ func (ss *Sections) Render() string {
 
 func (s *Section) Render() string {
 	var sb strings.Builder
-	if len(s.Notes) == 0 && !s.Subsections.HasNotes() {
+	if len(s.Notes) == 0 {
 		return ""
 	}
 	sb.WriteString(fmt.Sprintf("## %s\n\n", s.Title))
@@ -212,47 +171,6 @@ func (s *Section) Render() string {
 	}
 	sb.WriteString("\n")
 
-	for _, subsection := range s.Subsections.CustomSubsections {
-		sb.WriteString(subsection.Render())
-	}
-	sb.WriteString(s.Subsections.Other.Render())
-	return sb.String()
-}
-
-func (ss *Subsections) HasNotes() bool {
-	if ss == nil {
-		return false
-	}
-	if len(ss.Other.Notes) > 0 {
-		return true
-	}
-	for _, subsection := range ss.CustomSubsections {
-		if len(subsection.Notes) > 0 {
-			return true
-		}
-	}
-	return false
-}
-
-func (s *Subsection) Render() string {
-	var sb strings.Builder
-	if len(s.Notes) == 0 {
-		return ""
-	}
-	sb.WriteString(fmt.Sprintf("### %s\n\n", s.Title))
-	notesByAudience, audienceOrder := orderNotesByAudience(s.Notes)
-	for _, audience := range audienceOrder {
-		notes := notesByAudience[audience]
-		sb.WriteString(fmt.Sprintf("#### [%s]\n", strings.ToUpper(audience)))
-		for _, note := range notes {
-			author := "@" + note.PRInfo.Author.Login
-			if note.PRInfo.Author.IsBot {
-				author = "⚙️"
-			}
-			sb.WriteString(fmt.Sprintf("- %s **(#%d, %s)**\n", indent(strings.TrimSpace(note.Note), 2), note.PRInfo.Number, author))
-		}
-	}
-	sb.WriteString("\n")
 	return sb.String()
 }
 
