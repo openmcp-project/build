@@ -14,11 +14,10 @@ RELEASE_NOTES_TO_JSON_SCRIPT="$(realpath "$(dirname $0)/release-notes-to-json.sh
 CHANGELOG_GENERATOR_SCRIPT="$(realpath "$(dirname $0)/changelog/main.go")"
 cd $(dirname "$0")/../../
 
-LATEST_RELEASE_TAG="v0.2.0"
-# LATEST_RELEASE_TAG=$(gh release list --json tagName,isLatest --jq '.[] | select(.isLatest)|.tagName')
-# if [[ -z "$LATEST_RELEASE_TAG" ]]; then # first release?
-#   LATEST_RELEASE_TAG=$(git rev-list --max-parents=0 HEAD) # first commit in the branch.
-# fi
+LATEST_RELEASE_TAG=$(gh release list --json tagName,isLatest --jq '.[] | select(.isLatest)|.tagName')
+if [[ -z "$LATEST_RELEASE_TAG" ]]; then # first release?
+  LATEST_RELEASE_TAG=$(git rev-list --max-parents=0 HEAD) # first commit in the branch.
+fi
 
 GIT_LOG_OUTPUT=$(git log "$LATEST_RELEASE_TAG"..HEAD --oneline --pretty=format:"%s")
 PR_COMMITS=$(echo "$GIT_LOG_OUTPUT" | grep -oE "#[0-9]+" || true | tr -d '#' | sort -u)
