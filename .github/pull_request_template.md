@@ -12,7 +12,7 @@ Fixes #
 
 Format of block header: <category> <target_group>
 Possible values:
-- category:       breaking|feature|bugfix|doc|other
+- category:       breaking|feature|bugfix|refactor|doc|chore|other
 - target_group:   user|operator|developer|dependency
 -->
 ```feature user
