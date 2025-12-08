@@ -20,11 +20,6 @@ jobs:
           app-id: 1312871
           private-key: ${{ secrets.OPENMCP_CI_APP_PRIVATE_KEY }}
 
-      - name: Set up Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
-        with:
-          go-version-file: go.mod
-
       - name: Checkout code
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
@@ -32,6 +27,11 @@ jobs:
           fetch-tags: true
           fetch-depth: 0
           submodules: recursive
+
+      - name: Set up Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+        with:
+          go-version-file: go.mod
 
       - name: test-action
         run: cd hack/common; git status
