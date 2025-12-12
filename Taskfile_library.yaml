@@ -50,7 +50,7 @@ vars:
     sh: 'cat "{{.ROOT_DIR2}}/go.mod" | grep "module " | sed "s/module //" | sed -E "s/[[:blank:]].*//"'
   NESTED_MODULES: '{{.NESTED_MODULES | default "" }}'
   DOCKERFILE: '{{.DOCKERFILE | default (print .TASKFILE_DIR2 "/Dockerfile") }}'
-
+  ADDITIONAL_CHARTS: '{{.ADDITIONAL_CHARTS | default "" }}'
 
   LOCALBIN: '{{ env "LOCALBIN" | default ( .LOCALBIN | default (print .ROOT_DIR2 "/bin") ) }}'
   LOCALTMP: '{{ env "LOCALTMP" | default ( .LOCALTMP | default (print .ROOT_DIR2 "/tmp") ) }}'
