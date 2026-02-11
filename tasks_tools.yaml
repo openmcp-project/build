@@ -178,7 +178,7 @@ tasks:
     deps:
     - localbin
     vars:
-      ENVTEST_VERSION: '{{ env "ENVTEST_VERSION" | default ( .ENVTEST_VERSION | default "release-0.16" ) }}'
+      ENVTEST_VERSION: '{{ env "ENVTEST_VERSION" | default ( .ENVTEST_VERSION | default "release-0.23" ) }}'
       ENVTEST_K8S_VERSION: '{{ env "ENVTEST_K8S_VERSION" | default ( .ENVTEST_K8S_VERSION | default "1.30.0" ) }}'
     status:
     - 'test -x "{{.ENVTEST}}"'
