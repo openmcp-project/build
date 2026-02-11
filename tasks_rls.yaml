@@ -103,6 +103,12 @@ tasks:
         VERSION: '{{.VERSION}}'
       task: set-chart-version-internal
     - for:
+        var: ADDITIONAL_CHARTS
+      vars:
+        CHART_PATH: '{{.ITEM}}'
+        VERSION: '{{.VERSION}}'
+      task: set-chart-version-internal-raw
+    - for:
         var: NESTED_MODULES
       vars:
         MODULE: '{{.ITEM}}'
@@ -118,9 +124,23 @@ tasks:
       - VERSION
       - COMPONENT
     cmds:
-    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@version: v?[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+.*@version: {{.VERSION}}@1" "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml"'
-    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@appVersion: v?[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+.*@appVersion: {{.VERSION}}@1" "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml"'
-    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@  tag: .*@  tag: {{.VERSION}}@" "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/values.yaml"'
+    - vars:
+        VERSION: '{{.VERSION}}'
+        CHART_PATH: '{{.ROOT_DIR2}}/charts/{{.COMPONENT}}'
+      task: set-chart-version-internal-raw
+    internal: true
+
+  set-chart-version-internal-raw:
+    desc: "  Sets the versions in the helm chart at a specific path."
+    run: always
+    requires:
+      vars:
+      - VERSION
+      - CHART_PATH
+    cmds:
+    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@version: v?[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+.*@version: {{.VERSION}}@1" "{{.CHART_PATH}}/Chart.yaml"'
+    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@appVersion: v?[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+.*@appVersion: {{.VERSION}}@1" "{{.CHART_PATH}}/Chart.yaml"'
+    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@  tag: .*@  tag: {{.VERSION}}@" "{{.CHART_PATH}}/values.yaml"'
     internal: true
 
   set-module-version-internal:
