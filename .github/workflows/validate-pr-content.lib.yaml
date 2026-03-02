@@ -2,7 +2,7 @@ name: Validate Pull Request Content
 
 on:
   workflow_call:
-  
+
 jobs:
   validate-pr-content:
     runs-on: ubuntu-latest
@@ -16,6 +16,11 @@ jobs:
           echo "DEBUG: PR_USER is: $PR_USER"
 
           if [ "$PR_USER" = "renovate[bot]" ]; then
+            echo "Validation skipped for user: $PR_USER"
+            exit 0
+          fi
+
+          if [ "$PR_USER" = "dependabot[bot]" ]; then
             echo "Validation skipped for user: $PR_USER"
             exit 0
           fi
