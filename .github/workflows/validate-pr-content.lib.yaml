@@ -15,13 +15,8 @@ jobs:
           echo "DEBUG: PR_BODY content is: $PR_BODY"
           echo "DEBUG: PR_USER is: $PR_USER"
 
-          if [ "$PR_USER" = "renovate[bot]" ]; then
-            echo "Validation skipped for user: $PR_USER"
-            exit 0
-          fi
-
-          if [ "$PR_USER" = "dependabot[bot]" ]; then
-            echo "Validation skipped for user: $PR_USER"
+          if [[ "$PR_USER" == *"[bot]" ]]; then
+            echo "Validation skipped for bot user: $PR_USER"
             exit 0
           fi
 
