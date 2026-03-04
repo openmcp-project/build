@@ -50,7 +50,8 @@ vars:
     sh: 'cat "{{.ROOT_DIR2}}/go.mod" | grep "module " | sed "s/module //" | sed -E "s/[[:blank:]].*//"'
   NESTED_MODULES: '{{.NESTED_MODULES | default "" }}'
   DOCKERFILE: '{{.DOCKERFILE | default (print .TASKFILE_DIR2 "/Dockerfile") }}'
-
+  COMPONENT_CONSTRUCTOR:
+    sh: '[ -n "{{.COMPONENT_CONSTRUCTOR_PATH}}" ] && echo "{{.ROOT_DIR2}}/{{.COMPONENT_CONSTRUCTOR_PATH}}" || echo "{{.TASKFILE_DIR2}}/components.yaml"'
 
   LOCALBIN: '{{ env "LOCALBIN" | default ( .LOCALBIN | default (print .ROOT_DIR2 "/bin") ) }}'
   LOCALTMP: '{{ env "LOCALTMP" | default ( .LOCALTMP | default (print .ROOT_DIR2 "/tmp") ) }}'
@@ -100,13 +101,13 @@ tasks:
     run: once
     deps:
     - generate:generate
-  
+
   test:
     desc: "  Run all tests."
     run: once
     deps:
     - validate:test
-  
+
   validate:
     desc: "  Combines all validation tasks except for tests."
     run: once
@@ -115,7 +116,7 @@ tasks:
     - check
     deps:
     - validate:validate
-  
+
   version:
     desc: "  Print the version of the project. Use VERSION_OVERRIDE to make this task print a specific version."
     run: once

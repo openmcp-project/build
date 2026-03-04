@@ -32,6 +32,7 @@ tasks:
       - VERSION
       - MODULE_NAME
       - REPO_URL
+      - COMPONENT_CONSTRUCTOR
     vars:
       CHART_REGISTRY:
         sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --helm'
@@ -42,7 +43,7 @@ tasks:
       compdir: '{{.LOCALTMP}}/component'
     cmds:
     - |
-      "{{.OCM}}" add componentversions --file "{{.compdir}}" --version "{{.VERSION}}" --create --force --templater spiff "{{.TASKFILE_DIR2}}/components.yaml" -- \
+      "{{.OCM}}" add componentversions --file "{{.compdir}}" --version "{{.VERSION}}" --create --force --templater spiff "{{.COMPONENT_CONSTRUCTOR}}" -- \
         VERSION="{{.VERSION}}" \
         CHART_REGISTRY="{{.CHART_REGISTRY}}" \
         IMG_REGISTRY="{{.IMAGE_REGISTRY}}" \
