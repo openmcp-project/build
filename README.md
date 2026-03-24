@@ -161,6 +161,51 @@ To re-use it, simply create a symbolic link from the importing repo:
 ln -s ./hack/common/Makefile Makefile
 ```
 
+## GitHub Actions Workflows
+
+This repository provides reusable GitHub Actions workflows that can be called from downstream repositories.
+
+### Available Workflows
+
+| Workflow | Purpose |
+|---|---|
+| `ci.lib.yaml` | Runs code generation, validation, and tests |
+| `publish.lib.yaml` | Builds and publishes images, charts, and OCM components |
+| `release.lib.yaml` | Creates releases and tags |
+| `renovate-generate.lib.yaml` | Runs `task generate` on Renovate branches and commits the result |
+
+### Renovate: Auto-generate after dependency updates
+
+When Renovate updates a dependency (e.g. Go module, tool version), files like CRD manifests or generated code may need to be regenerated. The `renovate-generate.lib.yaml` workflow handles this automatically: it triggers on pushes to `renovate/**` branches, runs `task generate`, and commits any changed files back to the branch.
+
+To use it, add the following workflow to the downstream repository:
+
+```yaml
+# .github/workflows/renovate-generate.yaml
+name: Renovate Generate
+
+on:
+  push:
+    branches:
+      - "renovate/**"
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    uses: openmcp-project/build/.github/workflows/renovate-generate.lib.yaml@main
+    secrets: inherit
+```
+
+Also add the following to the repository's `renovate.json`. This tells Renovate to ignore commits from `github-actions[bot]` when determining whether a branch has been modified externally, which is necessary to keep `:rebaseStalePrs` working correctly:
+
+```json
+"gitIgnoredAuthors": [
+  "github-actions[bot]@users.noreply.github.com"
+]
+```
+
 ## Documentation Index Generation
 
 This repository contains a script for creating a index for the documentation of the importing repository. This script is not executed by default, only if the `GENERATE_DOCS_INDEX` variable is explicitly set to anything except `false` in the importing Taskfile. Doing so will not only activate the documentation index generation, but also a check whether it is up-to-date during the `validate:docs` task.
