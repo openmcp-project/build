@@ -88,6 +88,9 @@ Since the imported Taskfile is generic, there are a few variables that need to b
   - See below for a short documentation of the the index generation.
 - `ENVTEST_REQUIRED`
   - If this is set to `true`, the `test` task will include the `setup-envtest` tooling in its dependencies and download it automatically.
+- `ADDITIONAL_CHARTS`
+  - Can be set to multiple paths (separated by space) to helm chart directories. The versions in these charts' `Chart.yaml` and `values.yaml` will be increased during releases.
+  - Note that the charts for each module (located at `charts/<module>`) will always have their version increased and do not need to be listed here.
 
 There are two main Taskfiles, one of which should be included:
 - `Taskfile_controller.yaml` is meant for operator repositories and contains task definitions for code generation and validation, binary builds, and image builds.
