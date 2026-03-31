@@ -1,0 +1,48 @@
+version: 3
+
+# This Taskfile is meant to be included for CLI repos.
+# In addition to the library tasks, it contains tasks for building binaries installing the CLI tool.
+
+run: once
+method: checksum
+
+includes:
+  lib:
+    taskfile: Taskfile_library.yaml
+    vars:
+      IS_CLI: true
+    flatten: true
+  build:
+    taskfile: tasks_cli_build.yaml
+    aliases:
+    - bld
+    - b
+
+tasks:
+
+  # The following tasks are non-namespaced aliases for the most important namespaced tasks.
+  # This helps with visibility on 'task -l'.
+
+  install:
+    desc: "  Install the CLI tool."
+    run: once
+    cmds:
+    - 'CGO_ENABLED=0 go install -ldflags="-X {{.MODULE_NAME}}/internal/version.buildVersion={{.VERSION}} -X {{.MODULE_NAME}}/internal/version.gitTreeState={{.GIT_TREE_STATE}} -X {{.MODULE_NAME}}/internal/version.gitCommit={{.GIT_COMMIT}} -X {{.MODULE_NAME}}/internal/version.buildDate={{.BUILD_DATE}}" "{{.ROOT_DIR2}}"'
+
+  build:
+    desc: "  Build the binaries. Includes code generation and validation."
+    summary: This is an alias for 'build:all'.
+    run: once
+    deps:
+    - task: build:all
+      vars:
+        IS_CLI: true
+
+  build-raw:
+    desc: "  Like 'build', but skips code generation/validation tasks."
+    summary: This is an alias for 'build:build-multi-raw'.
+    run: once
+    deps:
+    - task: build:build-multi-raw
+      vars:
+        IS_CLI: true

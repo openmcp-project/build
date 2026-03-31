@@ -11,12 +11,12 @@ includes:
 tasks:
   # This is a dummy task that serves as a separator between task namespaces in the 'task -l' output.
   "---":
-    desc: "{{.BLD_BIN_SEP}}"
+    desc: "{{.BLD_SEP}}"
     cmds:
     - cmd: echo "{{.SEP_MSG}}"
       silent: true
 
-  build:
+  bin:
     desc: '  Build the binary for $OS/$ARCH.'
     summary: |
       This task builds the binary for the current operating system and architecture.
@@ -24,21 +24,20 @@ tasks:
       The binary is saved in the 'bin' folder, as $COMPONENT.$OS-$ARCH.
     requires:
       vars:
-      - COMPONENTS
+      - NAME
       - OS
       - ARCH
     deps:
     - gen:tidy
     cmds:
-    - task: gen:generate # don't use deps, since they are executed in parallel
-    - task: val:validate # and we want the code generation
-    - task: val:test # to be executed before the validation.
-    - task: build-raw
+    - task: gen:all # don't use deps, since they are executed in parallel
+    - task: val:all # and we want the code generation to be executed before the validation.
+    - task: bin-raw
       vars:
         OS: '{{.OS}}'
         ARCH: '{{.ARCH}}'
 
-  build-raw:
+  bin-raw:
     desc: "  Build the binary. Opposed to the regular build, this one just builds and skips code generation/validation tasks."
     summary: |
       This task builds the binary for the current operating system and architecture.
@@ -46,30 +45,24 @@ tasks:
       The binary is saved in the 'bin' folder, as $COMPONENT.$OS-$ARCH.
     requires:
       vars:
-      - COMPONENTS
+      - NAME
       - OS
       - ARCH
       - VERSION
-      - GIT_TREE_STATE
-      - GIT_COMMIT
-      - BUILD_DATE
       - MODULE_NAME
     cmds:
-    - for:
-        var: COMPONENTS
-        as: COMPONENT
-      cmd: 'CGO_ENABLED=0 GOOS={{.OS}} GOARCH={{.ARCH}} go build -a -ldflags="-X {{.MODULE_NAME}}/internal/version.buildVersion={{.VERSION}} -X {{.MODULE_NAME}}/internal/version.gitTreeState={{.GIT_TREE_STATE}} -X {{.MODULE_NAME}}/internal/version.gitCommit={{.GIT_COMMIT}} -X {{.MODULE_NAME}}/internal/version.buildDate={{.BUILD_DATE}}" -o {{.ROOT_DIR2}}/bin/{{.COMPONENT}}.{{.OS}}-{{.ARCH}} {{.ROOT_DIR2}}/cmd/{{.COMPONENT}}/main.go'
+    - cmd: 'CGO_ENABLED=0 GOOS={{.OS}} GOARCH={{.ARCH}} go build -a -ldflags="-X {{.MODULE_NAME}}/internal/version.buildVersion={{.VERSION}} -X {{.MODULE_NAME}}/internal/version.gitTreeState={{.GIT_TREE_STATE}} -X {{.MODULE_NAME}}/internal/version.gitCommit={{.GIT_COMMIT}} -X {{.MODULE_NAME}}/internal/version.buildDate={{.BUILD_DATE}}" -o {{.ROOT_DIR2}}/bin/{{.NAME}}.{{.OS}}-{{.ARCH}} {{.ROOT_DIR2}}'
 
-  build-multi-raw:
+  bin-multi-raw:
     desc: "  Build multi-platform binaries. Skips code generation/validation tasks."
     requires:
       vars:
-      - COMPONENTS
+      - NAME
       - ALL_OS
       - ALL_ARCH
     cmds:
     - for:
-       matrix:
+        matrix:
           OS:
             ref: .ALL_OS
           ARCH:
@@ -77,20 +70,18 @@ tasks:
       vars:
         OS: '{{.ITEM.OS}}'
         ARCH: '{{.ITEM.ARCH}}'
-      task: build-raw
+      task: bin-raw
 
   all:
     desc: "  Build multi-platform binaries."
     aliases:
-    - build-multi
+    - bin-multi
     requires:
       vars:
-      - COMPONENTS
-      - ALL_OS
-      - ALL_ARCH
+      - NAME
     cmds:
     - for:
-       matrix:
+        matrix:
           OS:
             ref: .ALL_OS
           ARCH:
@@ -98,4 +89,5 @@ tasks:
       vars:
         OS: '{{.ITEM.OS}}'
         ARCH: '{{.ITEM.ARCH}}'
-      task: build
+      task: bin
+

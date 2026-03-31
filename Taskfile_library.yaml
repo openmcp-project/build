@@ -33,7 +33,7 @@ vars:
     sh: 'if [[ "{{.TASKFILE_DIR}}" == "{{.ROOT_DIR2}}" ]] || [[ "{{.TASKFILE_DIR}}" == "" ]]; then echo -n "{{.ROOT_DIR2}}/hack/common"; else echo -n "{{.TASKFILE_DIR}}"; fi'
 
   VERSION:
-    sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-version.sh'
+    sh: 'CLI="{{printf "%b" ( .IS_CLI | default false )}}" PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-version.sh'
   GIT_TREE_STATE:
     sh: 'git diff --quiet && echo "clean" || echo "dirty"'
   GIT_COMMIT:
@@ -51,7 +51,10 @@ vars:
   NESTED_MODULES: '{{.NESTED_MODULES | default "" }}'
   DOCKERFILE: '{{.DOCKERFILE | default (print .TASKFILE_DIR2 "/Dockerfile") }}'
 
+  ALL_OS: [linux, darwin]
+  ALL_ARCH: [amd64, arm64]
 
+  REFERENCE_GENERATOR: '{{ .REFERENCE_GENERATOR | default (print .ROOT_DIR2 "/hack/cmdref/main.go") }}'
   LOCALBIN: '{{ env "LOCALBIN" | default ( .LOCALBIN | default (print .ROOT_DIR2 "/bin") ) }}'
   LOCALTMP: '{{ env "LOCALTMP" | default ( .LOCALTMP | default (print .ROOT_DIR2 "/tmp") ) }}'
   CONTROLLER_GEN: '{{ .CONTROLLER_GEN | default (print .LOCALBIN "/controller-gen") }}'
@@ -66,9 +69,10 @@ vars:
   # separator strings
   SEP_MSG: "This is just a separator, what did you expect to happen?"
   MAIN_SEP:    "MAIN ###########################################################################"
-  GEN_SEP:     "CODE GENERATION ### generate / gen / g #########################################"
+  GEN_SEP:     "CODE AND DOCS GENERATION ### generate / gen / g ################################"
   VAL_SEP:     "CODE VALIDATION ### validate / val / v #########################################"
   BLD_SEP:     "BUILD ARTIFACTS ### build / bld / b ############################################"
+  BIN_SEP:     "BINARY BUILDING ### bin / b ####################################################"
   BLD_BIN_SEP: "BINARY BUILD --- bin -----------------------------------------------------------"
   BLD_IMG_SEP: "IMAGE BUILD --- img ------------------------------------------------------------"
   BLD_HLM_SEP: "HELM CHART BUILD --- helm ------------------------------------------------------"
@@ -99,16 +103,18 @@ tasks:
     desc: "  Combines all code generation tasks, including formatting."
     run: once
     deps:
-    - generate:generate
+    - generate:all
   
   test:
     desc: "  Run all tests."
+    summary: This is an alias for 'validate:test'.
     run: once
     deps:
     - validate:test
   
   validate:
     desc: "  Combines all validation tasks except for tests."
+    summary: This is an alias for 'validate:all'.
     run: once
     aliases:
     - verify

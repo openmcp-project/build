@@ -38,8 +38,9 @@ function getDocName() {
     fi
   fi
   if [[ -f "$filename" ]]; then
-    local firstheader=$(grep -m1 -E '^# (.*)$' "$filename")
-    echo "${firstheader#'# '}"
+    local firstheader=$(grep -m1 -E '^##? (.*)$' "$filename")
+    firstheader=${firstheader#* }
+    echo "${firstheader#' '}"
   fi
 }
 
@@ -53,6 +54,7 @@ println
 
 (
   cd "$DOCS_FOLDER"
+  LC_COLLATE="C.UTF-8" # keep sorting consistent across different environments
   for f in *; do 
     if [[ -d "$f" ]]; then
       foldername="$(getDocFolderName "$f")"
@@ -66,6 +68,7 @@ println
 
       (
         cd "$f"
+        LC_COLLATE="C.UTF-8" # keep sorting consistent across different environments
         for f2 in *.md; do
           docname="$(getDocName "../$f" "$f2")"
           if [[ -z "$docname" ]]; then
