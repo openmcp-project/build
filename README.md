@@ -251,8 +251,6 @@ Also add the following to the repository's `renovate.json`. This tells Renovate 
 
 The widely known package manager `homebrew` supports custom package repositories (called 'taps'), which are basically just github repositories that follow a specific structure. Usually, they contain a `Formula` folder which contains scripts for each package ('formula') that is available via the tap. This repository contains a github workflow which can be used to make a CLI tool available via a homebrew tap.
 
-For the workflow to work, a github secret needs to be available, containing an access token that has 'repo' permissions for both the CLI repo as well as the homebrew tap repo.
-
 The homebrew tap repo's name must be prefixed with `homebrew-`.
 
 The workflow can then be reused like this:
@@ -271,7 +269,6 @@ jobs:
     with:
       username: <user/org name of homebrew tap repo owner>
       tap: <homebrew tap repo name> # must start with 'homebrew-'
-      secret_name: <name of github secret containing the access token>
       binary: <binary name> # optional
       readme_table: false # optional
 ```
