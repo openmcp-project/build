@@ -24,6 +24,22 @@ permissions:
   pull-requests: read
 
 jobs:
+  verify_secret:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify secrets
+        run: |
+          echo "app id: ${{ inputs.app_id }}"
+          if [[ -z "${{ inputs.app_id }}" ]]; then
+            echo "app id is not set"
+            exit 1
+          fi
+          echo "app private key secret name: ${{ inputs.app_private_key_secret_name }}"
+          if [[ -z "${{ secrets[inputs.app_private_key_secret_name] }}" ]]; then
+            echo "app private key is not set"
+            exit 1
+          fi
+          echo "All required secrets are set"
   release_tag:
     name: Release version
     runs-on: ubuntu-24.04
