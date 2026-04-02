@@ -8,11 +8,10 @@ on:
         required: false
         default: 1312871 # OpenMCP CI GitHub App
         type: string
-      app_private_key_secret_name:
-        description: 'GitHub App private key secret name for creating a GitHub App token'
+    secrets:
+      app_private_key:
+        description: 'GitHub App private key for creating a GitHub App token.'
         required: false
-        default: OPENMCP_CI_APP_PRIVATE_KEY
-        type: string
   
 permissions:
   packages: write
@@ -31,7 +30,7 @@ jobs:
         with:
           # required
           app-id: ${{ inputs.app_id }}
-          private-key: ${{ secrets[inputs.app_private_key_secret_name] }}
+          private-key: ${{ case( secrets.app_private_key != '', secrets.app_private_key, secrets.OPENMCP_CI_APP_PRIVATE_KEY ) }}
 
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6

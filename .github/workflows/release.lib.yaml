@@ -8,38 +8,21 @@ on:
         required: false
         default: 1312871 # OpenMCP CI GitHub App
         type: string
-      app_private_key_secret_name:
-        description: 'GitHub App private key secret name for creating a GitHub App token'
-        required: false
-        default: OPENMCP_CI_APP_PRIVATE_KEY
-        type: string
       is_cli:
         description: 'Indicates if this workflow is for a CLI tool (instead of a controller). If set, the built binaries will be attached to the release as artifacts.'
         required: false
         default: false
         type: boolean
+    secrets:
+      app_private_key:
+        description: 'GitHub App private key for creating a GitHub App token.'
+        required: false
 
 permissions:
   contents: write # we need this to be able to push tags
   pull-requests: read
 
 jobs:
-  verify_secret:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Verify secrets
-        run: |
-          echo "app id: ${{ inputs.app_id }}"
-          if [[ -z "${{ inputs.app_id }}" ]]; then
-            echo "app id is not set"
-            exit 1
-          fi
-          echo "app private key secret name: ${{ inputs.app_private_key_secret_name }}"
-          if [[ -z "${{ secrets[inputs.app_private_key_secret_name] }}" ]]; then
-            echo "app private key is not set"
-            exit 1
-          fi
-          echo "All required secrets are set"
   release_tag:
     name: Release version
     runs-on: ubuntu-24.04
@@ -50,7 +33,7 @@ jobs:
         with:
           # required
           app-id: ${{ inputs.app_id }}
-          private-key: ${{ secrets[inputs.app_private_key_secret_name] }}
+          private-key: ${{ case( secrets.app_private_key != '', secrets.app_private_key, secrets.OPENMCP_CI_APP_PRIVATE_KEY ) }}
 
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6

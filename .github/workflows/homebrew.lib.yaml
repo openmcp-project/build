@@ -10,11 +10,6 @@ on:
         required: false
         default: 1312871 # OpenMCP CI GitHub App
         type: string
-      app_private_key_secret_name:
-        description: 'GitHub App private key secret name for creating a GitHub App token'
-        required: false
-        default: OPENMCP_CI_APP_PRIVATE_KEY
-        type: string
       username:
         description: 'GitHub username of the homebrew tap owner/org'
         required: true
@@ -33,6 +28,10 @@ on:
         required: false
         default: false
         type: boolean
+    secrets:
+      app_private_key:
+        description: 'GitHub App private key for creating a GitHub App token.'
+        required: false
 
 jobs:
   homebrew-releaser:
@@ -45,7 +44,7 @@ jobs:
         with:
           # required
           app-id: ${{ inputs.app_id }}
-          private-key: ${{ secrets[inputs.app_private_key_secret_name] }}
+          private-key: ${{ case( secrets.app_private_key != '', secrets.app_private_key, secrets.OPENMCP_CI_APP_PRIVATE_KEY ) }}
 
       - name: Release project to Homebrew tap
         uses: Justintime50/homebrew-releaser@v3
