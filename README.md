@@ -17,7 +17,7 @@ Instead of `make`, we have decided to use the [task](https://taskfile.dev/) tool
 
 It is strongly recommended to include this submodule under the `hack/common` path in the operator repositories. While most of the coding is designed to work from anywhere within the including repository, there are some workarounds for bugs in `task` which rely on the assumption that this repo is a submodule under `hack/common` in the including repository.
 
-## Setup
+## General Setup
 
 To use this repository, first check it out via
 ```shell
@@ -28,7 +28,13 @@ and ensure that it is checked-out via
 git submodule init
 ```
 
-### Taskfile
+## Variants
+
+These shared build tools can be used for repositories containing k8s controllers, as well as for ones that contain CLI tools. There are differences between both use-cases, a k8s controller needs an container image and might have a helm chart, while neither is the case for a CLI tool, which might want to attach its binaries to the github release instead, for example. The following sections describe the specifics for both variants.
+
+### Controller/Library Variant
+
+#### Taskfile
 
 To use the generic Taskfile contained in this repository, create a `Taskfile.yaml` in the including repository. It should look something like this:
 ```yaml
@@ -106,7 +112,41 @@ includes:
     flatten: true
 ```
 
-#### Overwriting and Excluding Task Definitions
+#### Requirements
+
+The controller variant of the Taskfile is able to handle multiple 'components' (= controller binaries) within the same repositories, but it expects a certain format for filepaths:
+- Each component must have its `main.go` file at `cmd/<component>/main.go`.
+- If the component has a helm chart, it must be under `charts/<component>`.
+
+### CLI Variant
+
+#### Taskfile
+
+CLI repos must use the `Taskfile_cli.yaml` instead:
+```yaml
+version: 3
+
+includes:
+  shared:
+    taskfile: hack/common/Taskfile_cli.yaml
+    flatten: true
+    vars:
+      CODE_DIRS: '{{.ROOT_DIR}}/cmd/... {{.ROOT_DIR}}/internal/... {{.ROOT_DIR}}/lib/...'
+      NESTED_MODULES: 'lib'
+      NAME: 'ocp'
+      REPO_NAME: 'https://github.com/openmcp-project/ocp'
+      GENERATE_DOCS_INDEX: "true"
+```
+
+Most variables in the Taskfile behave exactly like for the controller variant, especially `CODE_DIRS`, `NESTED_MODULES`, and `REPO_NAME`. As a new variable, `NAME` has to be set to the name the CLI should be published under (`ocp` in the above example).
+
+#### Requirements
+
+The CLI taskfile currently supports only one binary per repository and its `main.go` file has to be at top-level within the repository (this also enables the tool to be installed via `go install`, as long as it does not contain any `replace` directives within its `go.mod` file).
+
+## Further Taskfile Information
+
+### Overwriting and Excluding Task Definitions
 
 Adding new specialized tasks in addition to the imported generic ones is straightforward: simply add the task definitions in the importing Taskfile.
 
@@ -173,6 +213,7 @@ This repository provides reusable GitHub Actions workflows that can be called fr
 | `publish.lib.yaml` | Builds and publishes images, charts, and OCM components |
 | `release.lib.yaml` | Creates releases and tags |
 | `renovate-generate.lib.yaml` | Runs `task generate` on Renovate branches and commits the result |
+| `homebrew.lib.yaml` | Makes the binary available via a custom homebrew tap (CLI variant only) |
 
 ### Renovate: Auto-generate after dependency updates
 
@@ -206,7 +247,48 @@ Also add the following to the repository's `renovate.json`. This tells Renovate 
 ]
 ```
 
-## Documentation Index Generation
+### Homebrew Workflow
+
+The widely known package manager `homebrew` supports custom package repositories (called 'taps'), which are basically just github repositories that follow a specific structure. Usually, they contain a `Formula` folder which contains scripts for each package ('formula') that is available via the tap. This repository contains a github workflow which can be used to make a CLI tool available via a homebrew tap.
+
+The homebrew tap repo's name must be prefixed with `homebrew-`.
+
+The workflow can then be reused like this:
+```yaml
+name: Homebrew Releaser
+
+on:
+  release:
+    types:
+    - published
+
+jobs:
+  homebrew:
+    uses: openmcp-project/build/.github/workflows/homebrew.lib.yaml@main
+    secrets: inherit
+    with:
+      username: <user/org name of homebrew tap repo owner>
+      tap: <homebrew tap repo name> # must start with 'homebrew-'
+      binary: <binary name> # optional
+      readme_table: false # optional
+```
+
+The binary name argument is optional. It specifies under which name the tool will be available in the homebrew tap. It has to match the name of the binary contained in the tarball attached to the release which triggered the workflow. This corresponds to the `NAME` variable that has to be specified in the CLI variant taskfile. If not specified, the workflow assumes this to be identical to the repository name.
+
+The github action that is used to manage the homebrew tap is also able to render a table listing all formulae of the tap into the tap repo's README. This requires a placeholder like this within the README:
+```markdown
+<!-- project_table_start -->
+TABLE HERE
+<!-- project_table_end -->
+```
+> [!NOTE]
+> For some reason, the action computes the table _before_ adding the calling repo's formula and it fails if there are no formulae within the tap, which means
+>   - table generation must be disabled for the first run, if the homebrew tap repo does not have any formulae yet
+>   - when a new formula is added, it will only appear in the table when the workflow is run again _after_ the run that added the new formula
+
+## Documentation Generation
+
+### Documentation Index
 
 This repository contains a script for creating a index for the documentation of the importing repository. This script is not executed by default, only if the `GENERATE_DOCS_INDEX` variable is explicitly set to anything except `false` in the importing Taskfile. Doing so will not only activate the documentation index generation, but also a check whether it is up-to-date during the `validate:docs` task.
 
@@ -218,7 +300,42 @@ The metadata file is named `.docnames` and is expected to be JSON-formatted, con
 
 Additional fields in the JSON object can be used to manipulate the entries for markdown files within the directory: An entry `"foo.md": "Bar"` in the object causes the `foo.md` file in the directory to be displayed as `Bar` in the generated index. Setting the value of such an entry to the empty string removes the corresponding file from the index.
 
-Markdown files whose name is not overwritten by a corresponding field in the metadata file are named according to the first line starting with `# ` in their content, or ignored if the name cannot be determined this way.
+Markdown files whose name is not overwritten by a corresponding field in the metadata file are named according to the first line starting with `# ` (or `## `) in their content, or ignored if the name cannot be determined this way.
+
+### Command Reference Generation (CLI only)
+
+The [cobra](https://github.com/spf13/cobra) framework, which is commonly used for CLI tool implementation, comes with the possibility to generate a markdown command reference. This can be automatically executend by the `generate:command-reference` task, which is part of the `generate` task. The reference generation requires a file like this
+```go
+package main
+
+import (
+	"os"
+
+	"github.com/spf13/cobra/doc"
+
+	"<my-cli-module>/cmd"
+)
+
+func main() {
+	if len(os.Args) < 2 {
+		panic("documentation folder path required as argument")
+	}
+	if err := doc.GenMarkdownTree(cmd.NewMyCommand(), os.Args[1]); err != nil {
+		panic(err)
+	}
+}
+```
+where `cmd.NewMyCommand()` returns the root `cobra.Command`.
+
+By default, this file is expected under `hack/cmdref/main.go`, but this location can be customized by setting the `REFERENCE_GENERATOR` variable in the taskfile.
+
+The command reference will be generated into `docs/reference`. While the reference generation creates the folder, if it doesn't exist, note that the `.docnames` file has to be added to it manually, if the command reference should appear in the documentation index (see above). This only needs to be done once.
+
+> [!IMPORTANT]
+> By default, the cobra reference generation adds a timestamp to each generated markdown file, which causes all of them to change every time the code generation is run, which causes a lot of irrelevant git changes. This behavior can be disabled by setting the `DisableAutoGenTag` to `true` in the `cobra.Command` that is is passed into `doc.GenMarkdownTree`.
+
+> [!NOTE]
+> While initially implemented for the `cobra` reference generation, `task generate:command-reference` actually just calls the go main file at the `REFERENCE_GENERATOR` path. This leaves the option to use some other tool or custom logic to generate the command reference. The generator gets one argument, which is the path to the folder where the command reference should be generated into.
 
 #### Limitations
 

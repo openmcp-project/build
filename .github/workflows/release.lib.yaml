@@ -2,6 +2,21 @@ name: Versioned Release
 
 on:
   workflow_call:
+    inputs:
+      app_id:
+        description: 'GitHub App ID for creating a GitHub App token'
+        required: false
+        default: 1312871 # OpenMCP CI GitHub App
+        type: string
+      is_cli:
+        description: 'Indicates if this workflow is for a CLI tool (instead of a controller). If set, the built binaries will be attached to the release as artifacts.'
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      app_private_key:
+        description: 'GitHub App private key for creating a GitHub App token.'
+        required: false
 
 permissions:
   contents: write # we need this to be able to push tags
@@ -17,8 +32,8 @@ jobs:
         id: app-token
         with:
           # required
-          app-id: 1312871
-          private-key: ${{ secrets.OPENMCP_CI_APP_PRIVATE_KEY }}
+          app-id: ${{ inputs.app_id }}
+          private-key: ${{ case( secrets.app_private_key != '', secrets.app_private_key, secrets.OPENMCP_CI_APP_PRIVATE_KEY ) }}
 
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -92,7 +107,12 @@ jobs:
             git push origin "${MODULE}/${{ env.version }}"
           done
 
+      - name: Generate release artifacts
+        if: ${{ ( env.SKIP != 'true' ) && inputs.is_cli }}
+        run: task r:artifacts --verbose  
+
       - name: Build Changelog
+        if: ${{ env.SKIP != 'true' }}
         id: github_release  
         run: task r:generate-changelog
         env:
@@ -107,15 +127,14 @@ jobs:
           body_path: ./CHANGELOG.md
           draft: true
           prerelease: false
+          files: ${{ fromJSON('["", "./bin/release/*"]')[inputs.is_cli] }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push dev VERSION
         if: ${{ env.SKIP != 'true' }}
         run: |
-          task release:set-version --verbose -- "${{ env.version }}-dev"
           git config user.name "${{ env.AUTHOR_NAME }}"
           git config user.email "${{ env.AUTHOR_EMAIL }}"
-          git add VERSION
-          git commit -m "chore(release): Update VERSION to ${{ env.version }}-dev"
+          task r:prepare-dev-cycle --verbose
           git push origin main

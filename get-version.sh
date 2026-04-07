@@ -1,4 +1,4 @@
-#!/bin/bash -eu
+#!/bin/bash
 
 set -euo pipefail
 source "$(realpath "$(dirname $0)/environment.sh")"

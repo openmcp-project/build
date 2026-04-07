@@ -36,7 +36,7 @@ tasks:
       cmd: '"{{.TASKFILE_DIR2}}/sed.sh" -E "s/toolchain go[0-9]+\.[0-9]+\.[0-9]+/toolchain go{{.GO_VERSION}}/" "{{.ROOT_DIR2}}/{{.MODULE}}/go.mod"' # overwrite toolchain in nested go.mod files
 
   all:
-    desc: "  Combines all code generation tasks, including formatting."
+    desc: "  Combines all code and documentation generation tasks, including formatting."
     run: once
     aliases:
     - generate
@@ -44,16 +44,17 @@ tasks:
     - task: tidy
     - task: code
     - task: manifests
+    - task: command-reference
     - task: docs
     - task: format
 
   manifests:
     desc: "  Generate manifests for CRDs."
     run: once
-    status:
-    - '[ "{{.API_DIRS | default ""}}" == "" ] || [ "{{.MANIFEST_OUT | default ""}}" == "" ]'
+    if: '{{ and ( not ( .IS_CLI | default false ) ) ( or ( ne ( .API_DIRS | default "" ) "" ) ( ne ( .MANIFEST_OUT | default "" ) "" ) ) }}'
     cmds:
     - task: manifests-internal
+    # internal: '{{ .IS_CLI | default false }}' # hide this task for CLI repos (https://github.com/go-task/task/issues/2769)
 
   manifests-internal:
     desc: "  Generate manifests for CRDs."
@@ -74,10 +75,10 @@ tasks:
   code:
     desc: "  Generate code (mainly DeepCopy functions) for all modules."
     run: once
-    status:
-    - '[ "{{.API_DIRS | default ""}}" == "" ]'
+    if: '{{ and ( not ( .IS_CLI | default false ) ) ( ne ( .API_DIRS | default "" ) "" ) }}'
     cmds:
     - task: code-internal
+    # internal: '{{ .IS_CLI | default false }}' # hide this task for CLI repos (https://github.com/go-task/task/issues/2769)
 
   code-internal:
     desc: "  Generate code (mainly DeepCopy functions) for all modules."
@@ -96,8 +97,7 @@ tasks:
   docs:
     desc: "  Generate the documentation index for the project. No effect, unless GENERATE_DOCS_INDEX is set to 'true' in the Taskfile."
     run: once
-    status:
-    - '[ "{{.GENERATE_DOCS_INDEX | default "false"}}" == "false" ]'
+    if: '{{ ne ( .GENERATE_DOCS_INDEX | default "false" ) "false" }}'
     cmds:
     - task: docs-internal
 
@@ -146,7 +146,7 @@ tasks:
       code_dirs:
         sh: '{{.TASKFILE_DIR2}}/unfold.sh --clean --no-unfold --inline {{.CODE_DIRS}}' # goimports doesn't like the '/...' syntax
     cmds:
-    - '{{.FORMATTER}} -l -w -local={{.MODULE_NAME}} {{.code_dirs}}'
+    - '{{.FORMATTER}} -l -w -local={{.MODULE_NAME}} {{if ( .IS_CLI | default false )}}"{{.ROOT_DIR2}}/main.go"{{end}} {{.code_dirs}}'
 
   format:
     desc: "  Combines all formatting tasks."
@@ -154,3 +154,19 @@ tasks:
     cmds:
     - task: fmt
     - task: format-imports
+
+  command-reference:
+    desc: "  Generate the command reference documentation. CLI only."
+    aliases:
+    - cmdref
+    run: once
+    requires:
+      vars:
+      - REFERENCE_GENERATOR
+    vars:
+      REFERENCE_GENERATOR: '{{ .REFERENCE_GENERATOR }}'
+    if: '{{ and ( .IS_CLI | default false ) ( ne .REFERENCE_GENERATOR "" ) }}'
+    cmds:
+    - 'rm -f "{{.ROOT_DIR2}}/docs/reference/"*.md'
+    - 'go run "{{.REFERENCE_GENERATOR}}" "{{.ROOT_DIR2}}/docs/reference"'
+    # internal: '{{ not ( .IS_CLI | default false ) }}' # hide this task for non-CLI repos (https://github.com/go-task/task/issues/2769)

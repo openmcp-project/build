@@ -1,5 +1,10 @@
 version: 3
 
+includes:
+  clibuild:
+    taskfile: tasks_cli_build.yaml
+    internal: true
+
 tasks:
   # This is a dummy task that serves as a separator between task namespaces in the 'task -l' output.
   "---":
@@ -50,12 +55,25 @@ tasks:
     vars:
       changes:
         sh: '( cd "{{.ROOT_DIR2}}"; git status --short )'
-    status:
-    - 'test -z "$( cd "{{.ROOT_DIR2}}" && git status --porcelain=v1)"'
+    if: 'test -n "$( cd "{{.ROOT_DIR2}}" && git status --porcelain=v1)"'
     prompt:
     - 'There are uncommitted changes in the working directory:{{"\n"}}{{.changes}}{{"\n\n"}}These changes will be included in the release commit, unless you stash, commit, or remove them otherwise before. Do you want to continue?'
     internal: true
-  
+
+  prepare-dev-cycle:
+    desc: "  Prepares the repository for further development after a release. Creates a commit that adds a '-dev' suffix to the version. Meant to be run after a release commit has been pushed to the main branch."
+    run: once
+    requires:
+      vars:
+      - VERSION
+      - MODULE_NAME
+      - NESTED_MODULES
+    cmds:
+    - task: set-version
+      vars:
+        CLI_ARGS: '{{.VERSION}}-dev'
+    - '( cd "{{.ROOT_DIR2}}"; git add VERSION go.mod; git commit -m "chore(release): prepare for next development iteration (version {{.VERSION}}-dev)" )'
+
   release-internal:
     desc: "  Prepares a new release by creating a commit that will result in a release when pushed."
     run: once
@@ -96,13 +114,15 @@ tasks:
       VERSION: '{{.CLI_ARGS | splitList " " | first}}'
     cmds:
     - 'echo -n "{{.VERSION}}" > "{{.ROOT_DIR2}}/VERSION"'
-    - for:
+    - if: '[[ ! "{{.VERSION}}" =~ .*-dev(-[0-9a-f]*)? ]]' # only set chart versions for release versions (without '-dev' suffix)
+      for:
         var: COMPONENTS
       vars:
         COMPONENT: '{{.ITEM}}'
         VERSION: '{{.VERSION}}'
       task: set-chart-version-internal
-    - for:
+    - if: '[[ ! "{{.VERSION}}" =~ .*-dev(-[0-9a-f]*)? ]]' # only set nested module versions for release versions (without '-dev' suffix)
+      for:
         var: NESTED_MODULES
       vars:
         MODULE: '{{.ITEM}}'
@@ -117,6 +137,7 @@ tasks:
       vars:
       - VERSION
       - COMPONENT
+    if: '{{ not ( .IS_CLI | default false ) }}' # skip this task for CLI repos, since they don't have charts
     cmds:
     - '{{.TASKFILE_DIR2}}/sed.sh -E "s@version: v?[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+.*@version: {{.VERSION}}@1" "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml"'
     - '{{.TASKFILE_DIR2}}/sed.sh -E "s@appVersion: v?[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+.*@appVersion: {{.VERSION}}@1" "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml"'
@@ -169,3 +190,27 @@ tasks:
       - VERSION
     cmds:
     -  'VERSION={{.VERSION}} {{.TASKFILE_DIR2}}/generate-changelog.sh'
+
+  artifacts:
+    desc: "  Creates the artifacts to be attached to a github release. Basically tar archives of the built binaries for each platform. Outputs them to bin/release. CLI only."
+    run: once
+    requires:
+      vars:
+      - NAME
+      - VERSION
+      - ALL_OS
+      - ALL_ARCH
+    vars:
+      VERSION_NO_PREFIX: '{{regexReplaceAll "^[vV]" .VERSION ""}}'
+    if: '{{ .IS_CLI | default false }}' # only run this task for CLI repos
+    deps:
+    - clibuild:bin-multi-raw
+    cmds:
+    - 'rm -rf {{.ROOT_DIR2}}/bin/release && mkdir -p {{.ROOT_DIR2}}/bin/release'
+    - for:
+        matrix:
+          OS:
+            ref: .ALL_OS
+          ARCH:
+            ref: .ALL_ARCH
+      cmd: 'rm -f "{{.ROOT_DIR2}}/bin/{{.NAME}}" && mv "{{.ROOT_DIR2}}/bin/{{.NAME}}.{{.ITEM.OS}}-{{.ITEM.ARCH}}" "{{.ROOT_DIR2}}/bin/{{.NAME}}" && tar -czf "{{.ROOT_DIR2}}/bin/release/{{.NAME}}-{{.VERSION_NO_PREFIX}}-{{.ITEM.OS}}-{{.ITEM.ARCH}}.tar.gz" -C "{{.ROOT_DIR2}}/bin" {{.NAME}}'

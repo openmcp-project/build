@@ -2,6 +2,16 @@ name: Publish
 
 on:
   workflow_call:
+    inputs:
+      app_id:
+        description: 'GitHub App ID for creating a GitHub App token'
+        required: false
+        default: 1312871 # OpenMCP CI GitHub App
+        type: string
+    secrets:
+      app_private_key:
+        description: 'GitHub App private key for creating a GitHub App token.'
+        required: false
   
 permissions:
   packages: write
@@ -19,8 +29,8 @@ jobs:
         id: app-token
         with:
           # required
-          app-id: 1312871
-          private-key: ${{ secrets.OPENMCP_CI_APP_PRIVATE_KEY }}
+          app-id: ${{ inputs.app_id }}
+          private-key: ${{ case( secrets.app_private_key != '', secrets.app_private_key, secrets.OPENMCP_CI_APP_PRIVATE_KEY ) }}
 
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6

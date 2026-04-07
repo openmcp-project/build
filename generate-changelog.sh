@@ -25,9 +25,6 @@ PR_COMMITS=$(echo "$GIT_LOG_OUTPUT" | grep -oE "#[0-9]+" || true | tr -d '#' | s
 PR_INFO_FILE=$(mktemp)
 echo "[" > "$PR_INFO_FILE"
 CHANGELOG_FILE=./CHANGELOG.md
-# File header Header
-echo "# Changes included in $VERSION:" > "$CHANGELOG_FILE"
-echo "" >> "$CHANGELOG_FILE"
 
 is_first=true
 for PR_NUMBER in $PR_COMMITS; do
@@ -44,6 +41,6 @@ done
 echo "]" >> "$PR_INFO_FILE"
 
 echo "Executing changelog generator for $PR_INFO_FILE ..."
-go run "$CHANGELOG_GENERATOR_SCRIPT" "$PR_INFO_FILE" >> "$CHANGELOG_FILE"
+go run "$CHANGELOG_GENERATOR_SCRIPT" "$PR_INFO_FILE" > "$CHANGELOG_FILE"
 
 cat "$CHANGELOG_FILE"

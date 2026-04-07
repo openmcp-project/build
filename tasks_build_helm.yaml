@@ -47,8 +47,7 @@ tasks:
       vars:
       - COMPONENT
       - VERSION
-    status:
-    - 'test ! -f "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml"'
+    if: 'test -f "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml"'
     cmds:
     - '"{{.HELM}}" package "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}" -d "{{.LOCALTMP}}" --version "{{.VERSION}}"'
     internal: true
@@ -83,8 +82,7 @@ tasks:
       - VERSION
       - HELM_REGISTRY
       - LOCALTMP
-    status:
-    - 'test ! -f "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml"'
+    if: 'test -f "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml"'
     vars:
       CHART_NAME: '{{.COMPONENT}}' # this requires the chart name to be the same as the component name
     cmds:

@@ -1,0 +1,58 @@
+# This workflow is meant to be triggered when a release is published.
+# It takes tarballed binaries from the release and updates a homebrew tap repository with a formula for the release.
+name: Homebrew Releaser
+
+on:
+  workflow_call:
+    inputs:
+      username:
+        description: 'GitHub username of the homebrew tap owner/org'
+        required: true
+        type: string
+      tap:
+        description: 'Name of the homebrew tap (must start with homebrew-)'
+        required: true
+        type: string
+      binary:
+        description: 'Name of the binary, as contained in the release artifact tarball. Defaults to the repository name, if not specified.'
+        required: false
+        default: '${{ github.event.repository.name }}'
+        type: string
+      readme_table:
+        description: 'Whether to update the homebrew tap README with a table of available formulae. Must be set to false for the first run, as the action computes the table before adding the new formula.'
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      token:
+        # It seems that the homebrew releaser action cannot handle app tokens, so we need to do this differently than for the other actions.
+        description: 'Personal access token with repo access for the homebrew tap repository.'
+        required: false
+
+jobs:
+  homebrew-releaser:
+    runs-on: ubuntu-24.04
+    name: Update Homebrew Tap Formula
+    steps:
+      - name: Release project to Homebrew tap
+        uses: Justintime50/homebrew-releaser@v3
+        with:
+          homebrew_owner: ${{ inputs.username }}
+          homebrew_tap: ${{ inputs.tap }}
+
+          github_token: ${{ secrets.token }}
+
+          # This expects the binary contained in the release artifact tarball to be named as the repository.
+          install: |
+            bin.install "${{ inputs.binary }}"
+
+          # For each of these which is true, a corresponding <name>-<version(no v prefix)>-<os>-<arch>.tar.gz file containing a binary must be attached to the release.
+          target_darwin_amd64: true
+          target_darwin_arm64: true
+          target_linux_amd64: true
+          target_linux_arm64: true
+
+          # This can be used to inject a table of the available formulae into the homebrew tap's README.
+          # For some reason, it computes the table _before_ adding the new formula, which also causes it to fail if there is not yet a formula in the tap,
+          # meaning this must be false for the first run.
+          update_readme_table: ${{ inputs.readme_table }}
