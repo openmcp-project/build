@@ -33,7 +33,7 @@ vars:
     sh: 'if [[ "{{.TASKFILE_DIR}}" == "{{.ROOT_DIR2}}" ]] || [[ "{{.TASKFILE_DIR}}" == "" ]]; then echo -n "{{.ROOT_DIR2}}/hack/common"; else echo -n "{{.TASKFILE_DIR}}"; fi'
 
   VERSION:
-    sh: 'CLI="{{printf "%b" ( .IS_CLI | default false )}}" PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-version.sh'
+    sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-version.sh'
   GIT_TREE_STATE:
     sh: 'git diff --quiet && echo "clean" || echo "dirty"'
   GIT_COMMIT:
