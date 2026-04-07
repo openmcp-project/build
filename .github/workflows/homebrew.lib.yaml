@@ -5,11 +5,6 @@ name: Homebrew Releaser
 on:
   workflow_call:
     inputs:
-      app_id:
-        description: 'GitHub App ID for creating a GitHub App token'
-        required: false
-        default: 1312871 # OpenMCP CI GitHub App
-        type: string
       username:
         description: 'GitHub username of the homebrew tap owner/org'
         required: true
@@ -29,8 +24,9 @@ on:
         default: false
         type: boolean
     secrets:
-      app_private_key:
-        description: 'GitHub App private key for creating a GitHub App token.'
+      token:
+        # It seems that the homebrew releaser action cannot handle app tokens, so we need to do this differently than for the other actions.
+        description: 'Personal access token with repo access for the homebrew tap repository.'
         required: false
 
 jobs:
@@ -38,21 +34,13 @@ jobs:
     runs-on: ubuntu-24.04
     name: Update Homebrew Tap Formula
     steps:
-      - name: Create GitHub App token
-        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2
-        id: app-token
-        with:
-          # required
-          app-id: ${{ inputs.app_id }}
-          private-key: ${{ case( secrets.app_private_key != '', secrets.app_private_key, secrets.OPENMCP_CI_APP_PRIVATE_KEY ) }}
-
       - name: Release project to Homebrew tap
         uses: Justintime50/homebrew-releaser@v3
         with:
           homebrew_owner: ${{ inputs.username }}
           homebrew_tap: ${{ inputs.tap }}
 
-          github_token: ${{ steps.app-token.outputs.token }}
+          github_token: ${{ secrets.token }}
 
           # This expects the binary contained in the release artifact tarball to be named as the repository.
           install: |
