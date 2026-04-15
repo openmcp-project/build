@@ -84,19 +84,14 @@ jobs:
           fi
           echo "Tag ${{ env.version }} doesn't exists. Proceeding with release."
 
+      - name: Configure Git for GitHub Actions
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Create Git tag
         if: ${{ env.SKIP != 'true' }}
         run: |
-          AUTHOR_NAME=$(git log -1 --pretty=format:'%an')
-          AUTHOR_EMAIL=$(git log -1 --pretty=format:'%ae')
-          echo "Tagging as $AUTHOR_NAME <$AUTHOR_EMAIL>"
-
-          echo "AUTHOR_NAME=$AUTHOR_NAME" >> $GITHUB_ENV
-          echo "AUTHOR_EMAIL=$AUTHOR_EMAIL" >> $GITHUB_ENV
-
-          git config user.name "$AUTHOR_NAME"
-          git config user.email "$AUTHOR_EMAIL"
-
           git tag -a "${{ env.version }}" -m "Release ${{ env.version }}"
           git push origin "${{ env.version }}"
 
@@ -134,7 +129,5 @@ jobs:
       - name: Push dev VERSION
         if: ${{ env.SKIP != 'true' }}
         run: |
-          git config user.name "${{ env.AUTHOR_NAME }}"
-          git config user.email "${{ env.AUTHOR_EMAIL }}"
           task r:prepare-dev-cycle --verbose
           git push origin main
