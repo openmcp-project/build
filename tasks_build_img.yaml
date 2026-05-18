@@ -29,6 +29,22 @@ tasks:
     - '( docker buildx ls | grep "{{.DOCKER_BUILDER_NAME}}" >/dev/null ) || docker buildx create --name {{.DOCKER_BUILDER_NAME}} >/dev/null' # duplicate the check because this might throw an error if run with '-f' otherwise
     internal: true
 
+  print-image:
+    desc: "  Print the built image name(s)."
+    requires:
+      vars:
+      - COMPONENTS
+      - VERSION
+      - OS
+      - ARCH
+    vars:
+      IMAGE_BASE:
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --image'
+    cmds:
+    - for:
+        var: COMPONENTS
+      cmd: 'echo "Built image: {{.IMAGE_BASE}}/{{.ITEM}}:{{.VERSION}}-{{.OS}}-{{.ARCH}}"'
+
   build:
     desc: "  Build the image for $IMAGE_OS/$ARCH."
     summary: |
@@ -71,6 +87,31 @@ tasks:
         OS: '{{.IMAGE_OS}}'
         ARCH: '{{.ARCH}}'
       task: build-internal
+
+  load-local:
+    desc: "  Load built image(s) into a KinD cluster."
+    summary: |
+      Loads the built images into a KinD cluster.
+      Set 'KIND_CLUSTER_NAME' to specify the cluster (default: 'platform').
+    requires:
+      vars:
+      - COMPONENTS
+      - VERSION
+    vars:
+      IMAGE_BASE:
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --image'
+      KIND_CLUSTER_NAME: '{{.KIND_CLUSTER_NAME | default "platform"}}'
+    cmds:
+    - for:
+        var: COMPONENTS
+      cmd: |
+        if [[ "$(go env GOOS)" == "darwin" ]]; then
+          echo "Loading {{.IMAGE_BASE}}/{{.ITEM}}:{{.VERSION}}-{{.IMAGE_OS}}-{{.ARCH}} into KinD cluster {{.KIND_CLUSTER_NAME}} (macOS mode)..."
+          docker save --platform="linux/{{.ARCH}}" "{{.IMAGE_BASE}}/{{.ITEM}}:{{.VERSION}}-{{.IMAGE_OS}}-{{.ARCH}}" | kind load image-archive --name "{{.KIND_CLUSTER_NAME}}" /dev/stdin
+        else
+          echo "Loading {{.IMAGE_BASE}}/{{.ITEM}}:{{.VERSION}}-{{.IMAGE_OS}}-{{.ARCH}} into KinD cluster {{.KIND_CLUSTER_NAME}}..."
+          kind load docker-image --name "{{.KIND_CLUSTER_NAME}}" "{{.IMAGE_BASE}}/{{.ITEM}}:{{.VERSION}}-{{.IMAGE_OS}}-{{.ARCH}}"
+        fi
 
   build-internal:
     desc: "  Build the image for a single component. Requires the docker builder to have been prepared before."

@@ -99,3 +99,67 @@ tasks:
         OS: '{{.ITEM.OS}}'
         ARCH: '{{.ITEM.ARCH}}'
       task: build
+
+  platform-cluster-check:
+    desc: "  Verify that that the operator is running against the platform cluster."
+    internal: true
+    requires:
+      vars:
+      - POD_NAMESPACE
+    cmds:
+    - cmd: |
+        {{if .KUBECONFIG}}KUBECONFIG="{{.KUBECONFIG}}" {{end}}kubectl get namespace "{{.POD_NAMESPACE}}" >/dev/null 2>&1 || \
+          { echo "Error: namespace '{{.POD_NAMESPACE}}' not found on the current cluster. Are you pointing at the platform cluster?"; exit 1; }
+
+  run-local-init:
+    desc: "  Run 'init' subcommand to install CRDs on the platform cluster."
+    summary: |
+      Runs the 'init' subcommand of the operator against the platform cluster.
+      Must be run before 'run-local' and re-run whenever CRD definitions change.
+      Set 'PROVIDER_NAME' to override the name of the ServiceProvider resource (defaults to COMPONENTS).
+      Optionally set 'KUBECONFIG' to the path of the platform cluster kubeconfig.
+      DEV_DEBUG=true is set automatically so the controller uses locally-reachable cluster addresses.
+    requires:
+      vars:
+      - COMPONENTS
+    vars:
+      PROVIDER_NAME: '{{.PROVIDER_NAME | default .COMPONENTS}}'
+    deps:
+    - task: platform-cluster-check
+      vars:
+        POD_NAMESPACE: '{{.POD_NAMESPACE | default "openmcp-system"}}'
+        KUBECONFIG: '{{.KUBECONFIG}}'
+    cmds:
+    - cmd: |
+        {{if .KUBECONFIG}}KUBECONFIG="{{.KUBECONFIG}}" {{end}}POD_NAMESPACE="{{.POD_NAMESPACE | default "openmcp-system"}}" DEV_DEBUG=true \
+        go run "{{.ROOT_DIR2}}/cmd/{{.COMPONENTS}}/main.go" init \
+          --environment "{{.ENVIRONMENT | default "local"}}" \
+          --provider-name "{{.PROVIDER_NAME}}" \
+          --verbosity "{{.VERBOSITY | default "DEBUG"}}"
+
+  run-local:
+    desc: "  Run the controller against a KinD cluster (requires run-local-init first)."
+    summary: |
+      Runs the operator against the platform cluster.
+      Set 'PROVIDER_NAME' to the name of the ServiceProvider resource.
+      Optionally set 'KUBECONFIG' to the path of the platform cluster kubeconfig.
+      DEV_DEBUG=true is set automatically so the controller uses locally-reachable
+      cluster addresses instead of in-cluster API server addresses.
+    interactive: true
+    requires:
+      vars:
+      - COMPONENTS
+    vars:
+      PROVIDER_NAME: '{{.PROVIDER_NAME | default .COMPONENTS}}'
+    deps:
+    - task: platform-cluster-check
+      vars:
+        POD_NAMESPACE: '{{.POD_NAMESPACE | default "openmcp-system"}}'
+        KUBECONFIG: '{{.KUBECONFIG}}'
+    cmds:
+    - cmd: |
+        {{if .KUBECONFIG}}KUBECONFIG="{{.KUBECONFIG}}" {{end}}POD_NAMESPACE="{{.POD_NAMESPACE | default "openmcp-system"}}" DEV_DEBUG=true \
+        go run "{{.ROOT_DIR2}}/cmd/{{.COMPONENTS}}/main.go" run \
+          --environment "{{.ENVIRONMENT | default "local"}}" \
+          --provider-name "{{.PROVIDER_NAME}}" \
+          --verbosity "{{.VERBOSITY | default "DEBUG"}}"
