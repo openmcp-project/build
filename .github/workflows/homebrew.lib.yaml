@@ -35,7 +35,7 @@ jobs:
     name: Update Homebrew Tap Formula
     steps:
       - name: Release project to Homebrew tap
-        uses: Justintime50/homebrew-releaser@v3
+        uses: Justintime50/homebrew-releaser@a62d7a359683bfc047cdb2431f53ee58241464d1 # v3
         with:
           homebrew_owner: ${{ inputs.username }}
           homebrew_tap: ${{ inputs.tap }}
