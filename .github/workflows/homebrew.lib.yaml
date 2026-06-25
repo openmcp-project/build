@@ -42,6 +42,8 @@ jobs:
 
           github_token: ${{ secrets.token }}
 
+          version: "${{ github.event.release.tag_name }}"
+
           # This expects the binary contained in the release artifact tarball to be named as the repository.
           install: |
             bin.install "${{ inputs.binary }}"
