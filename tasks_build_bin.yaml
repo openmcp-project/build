@@ -99,3 +99,101 @@ tasks:
         OS: '{{.ITEM.OS}}'
         ARCH: '{{.ITEM.ARCH}}'
       task: build
+
+  build-fips:
+    desc: '  Build FIPS-compliant binary for $OS/$ARCH using Microsoft Go + GOEXPERIMENT=systemcrypto.'
+    summary: |
+      Builds a FIPS-compliant binary using the Microsoft Go toolchain inside Docker.
+      The binary is compiled with GOEXPERIMENT=systemcrypto so that all crypto/* calls
+      are routed through the system OpenSSL (gardenlinux-fips) via dlopen at runtime.
+      Cross-compilation is fully handled inside the Docker builder image — no special
+      host toolchain required beyond Docker.
+      The binary is saved in the 'bin' folder, as $COMPONENT.$OS-$ARCH.
+    requires:
+      vars:
+      - COMPONENTS
+      - OS
+      - ARCH
+    deps:
+    - gen:tidy
+    cmds:
+    - task: gen:generate
+    - task: val:validate
+    - task: val:test
+    - task: build-fips-raw
+      vars:
+        OS: '{{.OS}}'
+        ARCH: '{{.ARCH}}'
+
+  build-fips-raw:
+    desc: "  Build FIPS-compliant binary. Skips code generation/validation tasks."
+    requires:
+      vars:
+      - COMPONENTS
+      - OS
+      - ARCH
+      - VERSION
+      - GIT_TREE_STATE
+      - GIT_COMMIT
+      - BUILD_DATE
+      - MODULE_NAME
+      - DOCKERFILE_FIPS_BUILDER
+    vars:
+      BUILDARCH:
+        sh: 'docker info --format "{{"{{"}}json .Architecture{{"}}"}}" | tr -d "\"" | sed "s/x86_64/amd64/;s/aarch64/arm64/"'
+    cmds:
+    - for:
+        var: COMPONENTS
+        as: COMPONENT
+      cmd: >
+        docker buildx build
+        --platform linux/{{.BUILDARCH}}
+        --target export
+        --build-arg BUILDARCH={{.BUILDARCH}}
+        --build-arg TARGETOS={{.OS}}
+        --build-arg TARGETARCH={{.ARCH}}
+        --build-arg COMPONENT={{.COMPONENT}}
+        --build-arg VERSION={{.VERSION}}
+        --build-arg GIT_TREE_STATE={{.GIT_TREE_STATE}}
+        --build-arg GIT_COMMIT={{.GIT_COMMIT}}
+        --build-arg BUILD_DATE={{.BUILD_DATE}}
+        --build-arg MODULE_NAME={{.MODULE_NAME}}
+        --output type=local,dest={{.ROOT_DIR2}}/bin
+        -f {{.DOCKERFILE_FIPS_BUILDER}}
+        {{.ROOT_DIR2}}
+
+  build-multi-fips-raw:
+    desc: "  Build FIPS-compliant multi-platform binaries. Skips code generation/validation tasks."
+    requires:
+      vars:
+      - COMPONENTS
+      - ALL_ARCH
+    cmds:
+    - for:
+        matrix:
+          OS: [linux]
+          ARCH:
+            ref: .ALL_ARCH
+      vars:
+        OS: '{{.ITEM.OS}}'
+        ARCH: '{{.ITEM.ARCH}}'
+      task: build-fips-raw
+
+  all-fips:
+    desc: "  Build FIPS-compliant multi-platform binaries."
+    aliases:
+    - build-multi-fips
+    requires:
+      vars:
+      - COMPONENTS
+      - ALL_ARCH
+    cmds:
+    - for:
+        matrix:
+          OS: [linux]
+          ARCH:
+            ref: .ALL_ARCH
+      vars:
+        OS: '{{.ITEM.OS}}'
+        ARCH: '{{.ITEM.ARCH}}'
+      task: build-fips
