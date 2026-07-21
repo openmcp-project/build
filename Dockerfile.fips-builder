@@ -71,7 +71,8 @@ RUN set -eux; \
         -ldflags="-X ${MODULE_NAME}/internal/version.buildVersion=${VERSION} \
                   -X ${MODULE_NAME}/internal/version.gitTreeState=${GIT_TREE_STATE} \
                   -X ${MODULE_NAME}/internal/version.gitCommit=${GIT_COMMIT} \
-                  -X ${MODULE_NAME}/internal/version.buildDate=${BUILD_DATE}" \
+                  -X ${MODULE_NAME}/internal/version.buildDate=${BUILD_DATE} \
+                  -X github.com/openmcp-project/controller-utils/pkg/fips.fipsEnforced=true" \
         -o /out/${COMPONENT}.${TARGETOS}-fips-${TARGETARCH} ./cmd/${COMPONENT}/main.go
 
 # Export stage — only the compiled binary is written to the output directory.
