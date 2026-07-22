@@ -94,6 +94,10 @@ jobs:
         run: |
           task build:img:all --verbose
 
+      - name: Verify FIPS compliance
+        run: |
+          task build:img:verify-fips --verbose
+
       - name: Package and Push Helm Charts
         run: |
           task build:helm:all --verbose

@@ -1,0 +1,85 @@
+# Builds a FIPS-compliant binary using Microsoft Go with GOEXPERIMENT=systemcrypto.
+# The resulting binary routes all crypto/* calls to the system OpenSSL via dlopen
+# at runtime, which on gardenlinux-fips resolves to the FIPS 140-validated OpenSSL.
+#
+# Usage (via `docker buildx build --output`):
+#   docker buildx build \
+#     --platform linux/<ARCH> \
+#     --build-arg BUILDARCH=<host-arch> \
+#     --build-arg TARGETOS=linux \
+#     --build-arg TARGETARCH=<ARCH> \
+#     --build-arg COMPONENT=<name> \
+#     --build-arg VERSION=... \
+#     --build-arg GIT_TREE_STATE=... \
+#     --build-arg GIT_COMMIT=... \
+#     --build-arg BUILD_DATE=... \
+#     --build-arg MODULE_NAME=... \
+#     --output type=local,dest=bin/ \
+#     -f Dockerfile.fips-builder .
+#
+# The binary is written to bin/<COMPONENT>.linux-fips-<ARCH> on the host.
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-bookworm
+ARG BUILDARCH
+ARG TARGETOS
+ARG TARGETARCH
+
+# Install cross-compiler + target-arch OpenSSL headers.
+# This layer is cached as long as BUILDARCH and TARGETARCH don't change,
+# so the expensive apt install only re-runs when the target architecture changes.
+RUN set -eux; \
+    if [ "$BUILDARCH" = "$TARGETARCH" ]; then \
+        apt-get update && apt-get install -y --no-install-recommends gcc libssl-dev; \
+    else \
+        dpkg --add-architecture "$TARGETARCH" && apt-get update; \
+        case "$TARGETARCH" in \
+            amd64) apt-get install -y --no-install-recommends gcc-x86-64-linux-gnu libc6-dev-amd64-cross libssl-dev:amd64 ;; \
+            arm64) apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu libc6-dev-arm64-cross libssl-dev:arm64 ;; \
+            *) echo "Unsupported TARGETARCH: $TARGETARCH"; exit 1 ;; \
+        esac; \
+    fi; \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
+ARG COMPONENT
+ARG VERSION
+ARG GIT_TREE_STATE
+ARG GIT_COMMIT
+ARG BUILD_DATE
+ARG MODULE_NAME
+WORKDIR /workspace
+COPY . .
+
+# Build the binary. CC must be inline — shell variables don't persist across RUN layers.
+# GOENV=off prevents any persisted Go env file from leaking a stale GOOS=darwin value,
+# which would cause the Go toolchain to inject macOS-style -arch flags into the gcc
+# cross-compiler invocation (see golang/go#74410).
+RUN set -eux; \
+    case "$BUILDARCH-$TARGETARCH" in \
+        amd64-amd64|arm64-arm64) CC=gcc ;; \
+        *-amd64) CC=x86_64-linux-gnu-gcc ;; \
+        *-arm64) CC=aarch64-linux-gnu-gcc ;; \
+        *) echo "Unsupported BUILDARCH-TARGETARCH: $BUILDARCH-$TARGETARCH"; exit 1 ;; \
+    esac; \
+    case "$TARGETARCH" in \
+        amd64) PKG=/usr/lib/x86_64-linux-gnu/pkgconfig ;; \
+        arm64) PKG=/usr/lib/aarch64-linux-gnu/pkgconfig ;; \
+    esac; \
+    CC="$CC" PKG_CONFIG_PATH="$PKG" \
+    GOENV=off \
+    CGO_ENABLED=1 GOEXPERIMENT=systemcrypto \
+    CGO_CFLAGS="" CGO_LDFLAGS="" \
+    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -a \
+        -ldflags="-X ${MODULE_NAME}/internal/version.buildVersion=${VERSION} \
+                  -X ${MODULE_NAME}/internal/version.gitTreeState=${GIT_TREE_STATE} \
+                  -X ${MODULE_NAME}/internal/version.gitCommit=${GIT_COMMIT} \
+                  -X ${MODULE_NAME}/internal/version.buildDate=${BUILD_DATE} \
+                  -X github.com/openmcp-project/controller-utils/pkg/fips.fipsEnforced=true" \
+        -o /out/${COMPONENT}.${TARGETOS}-fips-${TARGETARCH} ./cmd/${COMPONENT}/main.go
+
+# Export stage — only the compiled binary is written to the output directory.
+# This ensures `--output type=local,dest=bin/` on the host receives only the
+# binary, not the full build context or Go module cache.
+FROM scratch AS export
+ARG COMPONENT
+ARG TARGETOS
+ARG TARGETARCH
+COPY --from=0 /out/${COMPONENT}.${TARGETOS}-fips-${TARGETARCH} .
