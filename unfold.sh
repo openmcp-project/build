@@ -2,6 +2,16 @@
 
 set -euo pipefail
 
+# On macOS, prefer grealpath (GNU coreutils) over the BSD realpath which lacks --relative-base
+if ! realpath --relative-base=/ / &>/dev/null; then
+  if command -v grealpath &>/dev/null; then
+    realpath() { grealpath "$@"; }
+  else
+    echo "error: GNU realpath required (install via 'brew install coreutils')" >&2
+    exit 1
+  fi
+fi
+
 # This is a small helper script that takes a list of paths and unfolds them:
 #   If the path ends with '/...', the path itself (without '/...') and all of its subfolders are printed.
 #   Otherwise, only the path is printed.
