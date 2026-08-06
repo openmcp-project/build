@@ -185,7 +185,7 @@ tasks:
     - 'test -x "{{.ENVTEST}}"'
     - test -f {{.LOCALBIN}}/envtest_version
     - 'cat {{.LOCALBIN}}/envtest_version | grep -q "{{.ENVTEST_VERSION}}"'
-    - test -f {{.LOCALBIN}}/assets_path
+    - 'test -d "$(cat {{.LOCALBIN}}/assets_path)"'
     cmds:
     - 'GOBIN="{{.LOCALBIN}}" go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.ENVTEST_VERSION}}'
     - echo -n "{{.ENVTEST_VERSION}}" > {{.LOCALBIN}}/envtest_version
