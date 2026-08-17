@@ -20,6 +20,8 @@ jobs:
             exit 0
           fi
 
+          # TODO: when dependabot opens a PR, we might want to skip as well
+          # see https://github.com/openmcp-project/landscaper/pull/58
           REQUIRED_SECTIONS=("\\*\\*What this PR does / why we need it\\*\\*:" "\\*\\*Release note\\*\\*:")
 
           for SECTION in "${REQUIRED_SECTIONS[@]}"; do
