@@ -85,7 +85,7 @@ for f in "$@"; do
           if $inline_printed; then
             echo -n " "
           fi
-          echo -n "$tmp"
+          echo -n "${tmp//$'\n'/ }"
           inline_printed=true
         else
           if $inline_printed; then
