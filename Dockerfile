@@ -2,7 +2,7 @@
 # The binary must have been built with Dockerfile.fips-builder beforehand.
 # At runtime the binary dlopens gardenlinux's FIPS 140-validated OpenSSL,
 # which is pre-configured as the default crypto provider in this image.
-FROM ghcr.io/gardenlinux/gardenlinux-fips:1877.19
+FROM ghcr.io/gardenlinux/gardenlinux/fips:1877.23
 ARG TARGETOS
 ARG TARGETARCH
 ARG COMPONENT
