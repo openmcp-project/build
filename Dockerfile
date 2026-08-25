@@ -1,12 +1,15 @@
-# Use distroless as minimal base image to package the component binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static-debian12:nonroot@sha256:1b7b9f0f0e0a1d2155f531db587cc48ec26aaf97ab64364225f5bf18a054e66a
+# Minimal FIPS-compliant runtime image.
+# The binary must have been built with Dockerfile.fips-builder beforehand.
+# At runtime the binary dlopens gardenlinux's FIPS 140-validated OpenSSL,
+# which is pre-configured as the default crypto provider in this image.
+FROM ghcr.io/gardenlinux/gardenlinux/fips:1877.23
+
 ARG TARGETOS
 ARG TARGETARCH
 ARG COMPONENT
 WORKDIR /
-COPY bin/$COMPONENT.$TARGETOS-$TARGETARCH /<component>
+COPY bin/$COMPONENT.$TARGETOS-fips-$TARGETARCH /<component>
 USER 65532:65532
 
-# docker doesn't substitue args in ENTRYPOINT, so we replace this during the build script
+# docker doesn't substitute args in ENTRYPOINT, so we replace this during the build script
 ENTRYPOINT ["/<component>"]
