@@ -153,7 +153,7 @@ tasks:
       - MODULE
       - MODULE_NAME
     cmds:
-    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@	{{.MODULE_NAME}}/{{.MODULE}} v.*@	{{.MODULE_NAME}}/{{.MODULE}} {{.VERSION}}@" "{{.ROOT_DIR2}}/go.mod"'
+    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@	{{.MODULE_NAME}}/{{.MODULE}}(/v[0-9]+)? v.*@	{{.MODULE_NAME}}/{{.MODULE}}\1 {{.VERSION}}@" "{{.ROOT_DIR2}}/go.mod"'
     - for:
         var: NESTED_MODULES
       vars:

@@ -55,7 +55,7 @@ tasks:
     - localbin
     vars:
       # renovate: datasource=github-tags depName=tools packageName=golang/tools
-      FORMATTER_VERSION: '{{ env "FORMATTER_VERSION" | default ( .FORMATTER_VERSION | default "v0.43.0" ) }}'
+      FORMATTER_VERSION: '{{ env "FORMATTER_VERSION" | default ( .FORMATTER_VERSION | default "v0.48.0" ) }}'
     status:
     - test -x {{.FORMATTER}}
     - test -f {{.LOCALBIN}}/formatter_version
@@ -75,7 +75,7 @@ tasks:
     - localbin
     vars:
       # renovate: datasource=github-releases depName=golangci-lint packageName=golangci/golangci-lint
-      LINTER_VERSION: '{{ env "LINTER_VERSION" | default ( .LINTER_VERSION | default "v2.11.3" ) }}'
+      LINTER_VERSION: '{{ env "LINTER_VERSION" | default ( .LINTER_VERSION | default "v2.12.2" ) }}'
     status:
     - test -x {{.LINTER}}
     - '{{.LINTER}} --version | grep -q {{.LINTER_VERSION | trimPrefix "v"}}'
@@ -115,7 +115,7 @@ tasks:
     - localbin
     vars:
       # renovate: datasource=github-releases depName=helm packageName=helm/helm
-      HELM_VERSION: '{{ env "HELM_VERSION" | default ( .HELM_VERSION | default "v4.2.0" ) }}'
+      HELM_VERSION: '{{ env "HELM_VERSION" | default ( .HELM_VERSION | default "v4.2.4" ) }}'
       tmpdir:
         sh: 'mktemp -d'
     status:
@@ -185,6 +185,7 @@ tasks:
     - 'test -x "{{.ENVTEST}}"'
     - test -f {{.LOCALBIN}}/envtest_version
     - 'cat {{.LOCALBIN}}/envtest_version | grep -q "{{.ENVTEST_VERSION}}"'
+    - 'test -d "$(cat {{.LOCALBIN}}/assets_path)"'
     cmds:
     - 'GOBIN="{{.LOCALBIN}}" go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.ENVTEST_VERSION}}'
     - echo -n "{{.ENVTEST_VERSION}}" > {{.LOCALBIN}}/envtest_version
