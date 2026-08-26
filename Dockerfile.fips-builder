@@ -18,7 +18,7 @@
 #     -f Dockerfile.fips-builder .
 #
 # The binary is written to bin/<COMPONENT>.linux-fips-<ARCH> on the host.
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-bookworm
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.27-bookworm
 ARG BUILDARCH
 ARG TARGETOS
 ARG TARGETARCH
@@ -65,7 +65,7 @@ RUN set -eux; \
     esac; \
     CC="$CC" PKG_CONFIG_PATH="$PKG" \
     GOENV=off \
-    CGO_ENABLED=1 GOEXPERIMENT=systemcrypto \
+    CGO_ENABLED=1 \
     CGO_CFLAGS="" CGO_LDFLAGS="" \
     GOOS=$TARGETOS GOARCH=$TARGETARCH go build -a \
         -ldflags="-X ${MODULE_NAME}/internal/version.buildVersion=${VERSION} \
