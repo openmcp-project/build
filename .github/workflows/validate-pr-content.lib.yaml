@@ -20,7 +20,7 @@ jobs:
             exit 0
           fi
 
-          REQUIRED_SECTIONS=("\\*\\*What this PR does / why we need it\\*\\*:" "\\*\\*Release note\\*\\*:")
+          REQUIRED_SECTIONS=("\\*\\*What this PR does / why we need it\\*\\*:")
 
           for SECTION in "${REQUIRED_SECTIONS[@]}"; do
             echo "DEBUG: Checking for section: $SECTION"
