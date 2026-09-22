@@ -90,7 +90,7 @@ tasks:
     - vars:
         CLI_ARGS: '{{.RELEASE_VERSION}}'
       task: set-version
-    - '( cd "{{.ROOT_DIR2}}"; git add --all; git commit -m "feat: release {{.RELEASE_VERSION}}" )'
+    - '( cd "{{.ROOT_DIR2}}"; git add --all; git commit -m "chore(main): release {{.RELEASE_VERSION}}" )'
     internal: true
 
   set-version:
