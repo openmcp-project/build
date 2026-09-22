@@ -37,7 +37,7 @@ tasks:
       To overwrite the OS/arch, set the 'IMAGE_OS' and 'ARCH' environment variables.
       To overwrite the image's base path, set the 'IMAGE_REGISTRY' environment variable.
     cmds:
-    - task: build:bin:build-fips-raw
+    - task: build:bin:build-fips
       vars:
         OS: '{{.IMAGE_OS}}'
         ARCH: '{{.ARCH}}'
