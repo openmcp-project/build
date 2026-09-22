@@ -126,7 +126,7 @@ jobs:
           tag_name: ${{ env.version }}
           name: Release ${{ env.version }}
           body_path: ./CHANGELOG.md
-          draft: true
+          generate_release_notes: true
           prerelease: false
           files: ${{ fromJSON('["", "./bin/release/*"]')[inputs.is_cli] }}
         env:

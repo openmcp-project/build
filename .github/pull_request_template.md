@@ -5,10 +5,10 @@ Fixes #
 
 **Special notes for your reviewer**:
 
-**Release note**:
-<!--  Write your release note:
-1. Enter your release note in the below block.
-2. If no release note is required, just write "NONE" within the block.
+**Additional release notes (optional)**:
+<!--
+Release notes are generated automatically from conventional commits.
+Use this block only when additional communication is required. Otherwise leave it empty.
 
 Format of block header: <category> <target_group>
 Possible values:
