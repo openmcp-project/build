@@ -51,6 +51,11 @@ vars:
   NESTED_MODULES: '{{.NESTED_MODULES | default "" }}'
   DOCKERFILE: '{{.DOCKERFILE | default (print .TASKFILE_DIR2 "/Dockerfile") }}'
   DOCKERFILE_FIPS_BUILDER: '{{.DOCKERFILE_FIPS_BUILDER | default (print .TASKFILE_DIR2 "/Dockerfile.fips-builder") }}'
+  DOCKERFILE_NONFIPS: '{{.DOCKERFILE_NONFIPS | default (print .TASKFILE_DIR2 "/Dockerfile.nonfips") }}'
+  # Whether to build FIPS-compliant images. Set 'FIPS=false' to build standard
+  # (non-FIPS) images from a static CGO_ENABLED=0 binary on a distroless base.
+  FIPS:
+    sh: echo ${FIPS:-true}
 
   ALL_OS: [linux, darwin]
   ALL_ARCH: [amd64, arm64]

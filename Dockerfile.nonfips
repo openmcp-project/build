@@ -1,0 +1,15 @@
+# Minimal non-FIPS runtime image.
+# The binary must have been built as a static (CGO_ENABLED=0) binary beforehand
+# (via the regular `build:bin:build-raw` task), so no OpenSSL is required at runtime.
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
+
+ARG TARGETOS
+ARG TARGETARCH
+ARG COMPONENT
+WORKDIR /
+COPY bin/$COMPONENT.$TARGETOS-$TARGETARCH /<component>
+# The :nonroot variant already runs as uid/gid 65532; kept explicit for parity with the FIPS image.
+USER 65532:65532
+
+# docker doesn't substitute args in ENTRYPOINT, so we replace this during the build script
+ENTRYPOINT ["/<component>"]
