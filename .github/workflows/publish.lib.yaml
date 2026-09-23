@@ -13,6 +13,11 @@ on:
         required: false
         default: ""
         type: string
+      fips:
+        description: 'Whether to build FIPS-compliant images. When false, standard (non-FIPS) images are built and FIPS verification is skipped.'
+        required: false
+        default: true
+        type: boolean
     secrets:
       app_private_key:
         description: 'GitHub App private key for creating a GitHub App token.'
@@ -99,8 +104,11 @@ jobs:
       - name: Build and Push Images
         run: |
           task build:img:all --verbose
+        env:
+          FIPS: ${{ inputs.fips }}
 
       - name: Verify FIPS compliance
+        if: ${{ inputs.fips }}
         run: |
           task build:img:verify-fips --verbose
 

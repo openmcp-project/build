@@ -30,14 +30,22 @@ tasks:
     internal: true
 
   build:
-    desc: "  Build the FIPS-compliant image for $IMAGE_OS/$ARCH."
+    desc: "  Build the image for $IMAGE_OS/$ARCH."
     summary: |
-      Builds the FIPS binary (using Microsoft Go + GOEXPERIMENT=systemcrypto inside Docker)
-      and then packages it into a gardenlinux-fips runtime image.
+      By default this builds a FIPS-compliant image: the FIPS binary (Microsoft Go +
+      GOEXPERIMENT=systemcrypto inside Docker) packaged onto a gardenlinux-fips runtime image.
+      Set 'FIPS=false' to instead build a standard (non-FIPS) static binary and package it
+      onto a distroless runtime image.
       To overwrite the OS/arch, set the 'IMAGE_OS' and 'ARCH' environment variables.
       To overwrite the image's base path, set the 'IMAGE_REGISTRY' environment variable.
     cmds:
-    - task: build:bin:build-fips
+    - if: '{{ eq .FIPS "true" }}'
+      task: build:bin:build-fips
+      vars:
+        OS: '{{.IMAGE_OS}}'
+        ARCH: '{{.ARCH}}'
+    - if: '{{ ne .FIPS "true" }}'
+      task: build:bin:build
       vars:
         OS: '{{.IMAGE_OS}}'
         ARCH: '{{.ARCH}}'
@@ -79,10 +87,16 @@ tasks:
       - IMAGE_BASE
       - DOCKER_BUILDER_NAME
       - DOCKERFILE
+      - DOCKERFILE_NONFIPS
+    vars:
+      # FIPS builds use the gardenlinux-fips runtime image (DOCKERFILE); non-FIPS
+      # builds use the distroless runtime image (DOCKERFILE_NONFIPS). Each Dockerfile
+      # already encodes the matching bin/ artifact name in its own COPY.
+      ACTIVE_DOCKERFILE: '{{ if eq .FIPS "true" }}{{.DOCKERFILE}}{{ else }}{{.DOCKERFILE_NONFIPS}}{{ end }}'
     cmds:
-    - 'echo "Building image {{.COMPONENT}}:{{.VERSION}}-{{.OS}}-{{.ARCH}}"'
-    - '[[ "{{.OS}}" == "linux" ]] || { echo "The gardenlinux-fips base image only supports linux."; exit 1; }'
-    - 'cat "{{.DOCKERFILE}}" | sed "s/<component>/{{.COMPONENT}}/g" > "{{.ROOT_DIR2}}/Dockerfile.tmp"'
+    - 'echo "Building image {{.COMPONENT}}:{{.VERSION}}-{{.OS}}-{{.ARCH}} (FIPS={{.FIPS}})"'
+    - '[[ "{{.OS}}" == "linux" ]] || { echo "The runtime base image only supports linux."; exit 1; }'
+    - 'cat "{{.ACTIVE_DOCKERFILE}}" | sed "s/<component>/{{.COMPONENT}}/g" > "{{.ROOT_DIR2}}/Dockerfile.tmp"'
     - >
       ( cd "{{.ROOT_DIR2}}"; docker buildx build
       --builder {{.DOCKER_BUILDER_NAME}}
@@ -222,13 +236,17 @@ tasks:
       Kernel FIPS mode (/proc/sys/crypto/fips_enabled) is a property of the
       deployment host, not the image, and is therefore not checked here.
       Images must have been built before running this task.
+      This task is a no-op when 'FIPS=false' (non-FIPS images are not expected to pass).
     requires:
       vars:
       - COMPONENTS
       - VERSION
       - ALL_ARCH
     cmds:
-    - for:
+    - if: '{{ ne .FIPS "true" }}'
+      cmd: 'echo "FIPS=false — skipping FIPS compliance verification."'
+    - if: '{{ eq .FIPS "true" }}'
+      for:
         matrix:
           OS: [linux]
           ARCH:
