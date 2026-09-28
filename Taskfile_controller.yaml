@@ -10,6 +10,8 @@ includes:
   lib:
     taskfile: Taskfile_library.yaml
     flatten: true
+  local:
+    taskfile: tasks_local.yaml
   build:
     taskfile: tasks_build.yaml
     aliases:
