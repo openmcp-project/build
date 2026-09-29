@@ -41,6 +41,7 @@ tasks:
     status:
     - test -x {{.CONTROLLER_GEN}}
     - '{{.CONTROLLER_GEN}} --version | grep -q "{{.CONTROLLER_GEN_VERSION}}"'
+    - 'go version -m {{.CONTROLLER_GEN}} | head -n1 | grep -q "$(go env GOVERSION)"'
     cmds:
     - 'GOBIN="{{.LOCALBIN}}" go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_GEN_VERSION}}'
     internal: true
@@ -60,6 +61,7 @@ tasks:
     - test -x {{.FORMATTER}}
     - test -f {{.LOCALBIN}}/formatter_version
     - 'cat {{.LOCALBIN}}/formatter_version | grep -q "{{.FORMATTER_VERSION}}"'
+    - 'go version -m {{.FORMATTER}} | head -n1 | grep -q "$(go env GOVERSION)"'
     cmds:
     - 'GOBIN="{{.LOCALBIN}}" go install golang.org/x/tools/cmd/goimports@{{.FORMATTER_VERSION}}'
     - echo -n "{{.FORMATTER_VERSION}}" > {{.LOCALBIN}}/formatter_version
