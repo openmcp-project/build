@@ -104,7 +104,7 @@ tasks:
       set -eu
       env_name="{{env "OCPCTL_ENV"}}"
       test -n "$env_name" || { echo "Set OCPCTL_ENV or pass an environment name." >&2; exit 1; }
-      ocpctl clusters kubeconfig export -e $env_name -n 
+      ocpctl clusters kubeconfig export -e "$env_name" -n {{.LOCAL_CP}}
 
   clusters:list:
     desc: "  List all ocpctl envitonments."
