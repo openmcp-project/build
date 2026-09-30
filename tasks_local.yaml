@@ -300,9 +300,3 @@ tasks:
         --provider-name "{{.LOCAL_PROVIDER_NAME}}" \
         --verbosity DEBUG {{.COMMAND_ARGS}}
     internal: true
-
-  debug:
-    desc: "  Run the service-provider init and run command after each other"
-    cmds:
-    - task: sp:init
-    - task: sp:run
