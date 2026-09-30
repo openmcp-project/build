@@ -194,10 +194,10 @@ tasks:
 
   ocpctl:
     desc: "  Ensure ocpctl is installed."
-    internal: true
     deps:
     - localbin
     status:
-    - test -x "{{.LOCALBIN}}/ocpctl" || command -v ocpctl >/dev/null 2>&1
+    - test -x "{{.OCPCTL}}"
     cmds:
     - GOBIN="{{.LOCALBIN}}" go install github.com/openmcp-project/ocpctl@{{.LOCAL_OCPCTL_VERSION}}
+    internal: true
