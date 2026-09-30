@@ -1,0 +1,302 @@
+version: 3
+
+vars:
+  LOCAL_ENV: '{{ env "OCPCTL_ENV" }}'
+  LOCAL_CP: '{{ env "CONTROLPLANE_NAME" | default "test" }}'
+  LOCAL_KUBECONFIG_DIR: '{{ env "OCPCTL_KUBECONFIG_DIR" | default (print .ROOT_DIR2 "/tmp/ocpctl-kubeconfigs") }}'
+  LOCAL_PROVIDER_NAME: '{{ env "LOCAL_PROVIDER_NAME" | default (print .PROVIDER) }}'
+  LOCAL_PROVIDER_COMPONENT: '{{ env "LOCAL_PROVIDER_COMPONENT" | default (index (.COMPONENTS | splitList " ") 0) }}'
+  LOCAL_OCPCTL_VERSION: '{{ env "OCPCTL_VERSION" | default "v0.4.1" }}'
+  POD_NAMESPACE: '{{ env "POD_NAMESPACE" | default "openmcp-system" }}'
+  APPLY_DIR_PATH: '{{ if gt (len .CLI_ARGS) 0 }}{{ index (.CLI_ARGS | splitList " ") 0 }}{{ end }}'
+
+includes:
+  tools:
+    taskfile: tasks_tools.yaml
+    internal: true
+
+tasks:
+  # This is a dummy task that serves as a separator between task namespaces in the 'task -l' output.
+  "---":
+    desc: "{{.LOC_SEP}}"
+    cmds:
+    - cmd: echo "{{.SEP_MSG}}"
+      silent: true
+
+  env:validate:
+    desc: "  Validate the selected ocpctl environment name."
+    run: once
+    cmds:
+    - |
+      set -eu
+      env_name="{{.LOCAL_ENV}}"
+      case "$env_name" in
+        ''|*[!a-z0-9.-]*) echo "Set OCPCTL_ENV to a valid environment name." >&2; 
+        exit 1 
+        ;;
+      esac
+    internal: true
+
+  cp:validate:
+    desc: "  Validate the selected ControlPlane name."
+    run: once
+    cmds:
+    - |
+      set -eu
+      cp_name="{{.LOCAL_CP}}"
+      case "$cp_name" in
+        ''|*[!a-z0-9.-]*) 
+        echo "Set CONTROLPLANE_NAME to a valid ControlPlane name." >&2; 
+        exit 1 
+        ;;
+      esac
+    internal: true
+
+  provider:validate:
+    desc: "  Validate the selected service-provider name."
+    run: once
+    cmds:
+    - |
+      set -eu 
+      test -n "{{.LOCAL_PROVIDER_NAME}}" || { echo "Set LOCAL_PROVIDER_NAME before running this task." >&2; exit 1; }'
+    internal: true
+
+  env:apply:
+    desc: "  Create an ocpctl environment and export platform/onboarding kubeconfigs."
+    vars:
+      LOCAL_ENV: '{{ if gt (len .CLI_ARGS) 0 }}{{ index (.CLI_ARGS | splitList " ") 0 }}{{ else }}{{ env "OCPCTL_ENV" }}{{ end }}'
+    deps:
+    - tools:ocpctl
+    cmds:
+    - task: env:validate
+      vars:
+        LOCAL_ENV: '{{.LOCAL_ENV}}'
+    - |
+      set -eu
+      "{{.OCPCTL}}" env apply "{{.LOCAL_ENV}}"
+    - task: kubeconfig:export
+      vars:
+        LOCAL_ENV: '{{.LOCAL_ENV}}'
+
+  env:delete:
+    desc: "  Delete the selected ocpctl environment."
+    vars:
+      LOCAL_ENV: '{{ if gt (len .CLI_ARGS) 0 }}{{ index (.CLI_ARGS | splitList " ") 0 }}{{ else }}{{ env "OCPCTL_ENV" }}{{ end }}'
+    deps:
+    - tools:ocpctl
+    cmds:
+    - task: env:validate
+      vars:
+        LOCAL_ENV: '{{.LOCAL_ENV}}'
+    - |
+      set -eu
+      "{{.OCPCTL}}" env delete "{{.LOCAL_ENV}}"
+
+  env:list:
+    desc: "  List all ocpctl environments."
+    deps:
+    - tools:ocpctl
+    cmds:
+    - |
+      set -eu
+      "{{.OCPCTL}}" env list
+
+  cp:create:
+    desc: "  Create a ControlPlane on the onboarding cluster."
+    vars:
+      LOCAL_CP: '{{ if gt (len .CLI_ARGS) 0 }}{{ index (.CLI_ARGS | splitList " ") 0 }}{{ else }}{{ env "CONTROLPLANE_NAME" | default "test" }}{{ end }}'
+    cmds:
+    - task: cp:validate
+      vars:
+        LOCAL_CP: '{{.LOCAL_CP}}'
+    - task: kubeconfig:export
+      vars:
+        LOCAL_ENV: '{{.LOCAL_ENV}}'
+    - |
+      set -eu
+      kubectl --kubeconfig "{{.LOCAL_KUBECONFIG_DIR}}/{{.LOCAL_ENV}}/onboarding.kubeconfig" apply -f - <<EOF
+      apiVersion: core.open-control-plane.io/v2alpha1
+      kind: ControlPlane
+      metadata:
+        name: {{.LOCAL_CP}}
+        namespace: default
+      spec:
+        iam: {}
+      EOF
+      until [ "$(kubectl --kubeconfig "{{.LOCAL_KUBECONFIG_DIR}}/{{.LOCAL_ENV}}/onboarding.kubeconfig" get cp "{{.LOCAL_CP}}" -n default -o jsonpath='{.status.phase}' 2>/dev/null || true)" = Ready ]; do
+        kubectl --kubeconfig "{{.LOCAL_KUBECONFIG_DIR}}/{{.LOCAL_ENV}}/onboarding.kubeconfig" get cp "{{.LOCAL_CP}}" -n default 2>/dev/null || true
+        sleep 5
+      done
+
+  cp:delete:
+    desc: "  Delete a ControlPlane from the onboarding cluster."
+    vars:
+      LOCAL_CP: '{{ if gt (len .CLI_ARGS) 0 }}{{ index (.CLI_ARGS | splitList " ") 0 }}{{ else }}{{ env "CONTROLPLANE_NAME" | default "test" }}{{ end }}'
+    cmds:
+    - task: cp:validate
+      vars:
+        LOCAL_CP: '{{.LOCAL_CP}}'
+    - task: kubeconfig:export
+      vars:
+        LOCAL_ENV: '{{.LOCAL_ENV}}'
+    - |
+      set -eu
+      kubectl --kubeconfig "{{.LOCAL_KUBECONFIG_DIR}}/{{.LOCAL_ENV}}/onboarding.kubeconfig" delete cp "{{.LOCAL_CP}}" -n default --ignore-not-found
+
+  cp:access:
+    desc: "  Access ocpctl onboarding cluster."
+    vars:
+      LOCAL_CP: '{{ if gt (len .CLI_ARGS) 0 }}{{ index (.CLI_ARGS | splitList " ") 0 }}{{ else }}{{ env "CONTROLPLANE_NAME" | default "test" }}{{ end }}'
+    cmds:
+    - task: cp:validate
+      vars:
+        LOCAL_CP: '{{.LOCAL_CP}}'
+    - task: cluster:access
+      vars:
+        LOCAL_ENV: '{{.LOCAL_ENV}}'
+        CLUSTER: '{{.LOCAL_CP}}'
+
+  clusters:list:
+    desc: "  List all ocpctl clusters."
+    deps:
+    - tools:ocpctl
+    cmds:
+    - |
+      set -eu
+      "{{.OCPCTL}}" clusters list
+
+  sp:init:
+    desc: "  Initialize service-provider CRDs in the local environment."
+    cmds:
+    - task: sp:command
+      vars:
+        COMMAND: init
+
+  sp:run:
+    desc: "  Run the service-provider locally. Use task local:sp:run -- --dev --cli."
+    cmds:
+    - task: sp:command
+      vars:
+        COMMAND: run
+        COMMAND_ARGS: '{{.CLI_ARGS}}'
+
+  kubeconfig:export-all:
+    desc: "  Export kubeconfigs for all clusters in the selected environment."
+    vars:
+      LOCAL_ENV: '{{ if gt (len .CLI_ARGS) 0 }}{{ index (.CLI_ARGS | splitList " ") 0 }}{{ else }}{{ env "OCPCTL_ENV" }}{{ end }}'
+    cmds:
+    - task: kubeconfig:export
+      vars:
+        LOCAL_ENV: '{{.LOCAL_ENV}}'
+
+  kubeconfig:export:
+    desc: "  Export kubeconfigs for a local environment."
+    deps:
+    - tools:ocpctl
+    cmds:
+    - task: env:validate
+      vars:
+        LOCAL_ENV: '{{.LOCAL_ENV}}'
+    - |
+      set -eu
+      out="{{.LOCAL_KUBECONFIG_DIR}}/{{.LOCAL_ENV}}"
+      mkdir -p "$out"
+      chmod 700 "{{.LOCAL_KUBECONFIG_DIR}}" "$out"
+      # Publish only complete kubeconfigs so failed exports cannot corrupt an existing file.
+      "{{.OCPCTL}}" clusters kubeconfig get --environment "{{.LOCAL_ENV}}" --name platform >"$out/platform.kubeconfig.tmp"
+      mv "$out/platform.kubeconfig.tmp" "$out/platform.kubeconfig"
+      kubectl --kubeconfig "$out/platform.kubeconfig" get clusters -A -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | \
+      while IFS= read -r cluster_name; do
+        [ -n "$cluster_name" ] || continue
+        "{{.OCPCTL}}" clusters kubeconfig get --environment "{{.LOCAL_ENV}}" --name "$cluster_name" >"$out/$cluster_name.kubeconfig.tmp"
+        mv "$out/$cluster_name.kubeconfig.tmp" "$out/$cluster_name.kubeconfig"
+      done
+      echo "Kubeconfigs exported to $out"
+    internal: true
+
+  plat:apply:
+    desc: "  Apply resources to the platform cluster."
+    vars:
+      APPLY_DIR: '{{.APPLY_DIR_PATH | default (print .ROOT_DIR2 "/test/e2e/platform")}}'
+    cmds:
+    - task: cluster:apply
+      vars:
+        LOCAL_ENV: '{{.LOCAL_ENV}}'
+        CLUSTER: platform
+        APPLY_DIR: '{{.APPLY_DIR}}'
+
+  plat:access:
+    desc: "  Access ocpctl platform cluster."
+    cmds:
+    - task: cluster:access
+      vars:
+        LOCAL_ENV: '{{.LOCAL_ENV}}'
+        CLUSTER: platform
+
+  on:apply:
+    desc: "  Apply resources to the onboarding cluster."
+    vars:
+      APPLY_DIR: '{{.APPLY_DIR_PATH | default (print .ROOT_DIR2 "/test/e2e/onboarding")}}'
+    cmds:
+    - task: cluster:apply
+      vars:
+        LOCAL_ENV: '{{.LOCAL_ENV}}'
+        CLUSTER: onboarding
+        APPLY_DIR: '{{.APPLY_DIR}}'
+
+  on:access:
+    desc: "  Access ocpctl onboarding cluster."
+    cmds:
+    - task: cluster:access
+      vars:
+        LOCAL_ENV: '{{.LOCAL_ENV}}'
+        CLUSTER: onboarding
+
+  cluster:access:
+    desc: "  Export a kubeconfig for a local cluster."
+    deps:
+    - tools:ocpctl
+    cmds:
+    - task: env:validate
+      vars:
+        LOCAL_ENV: '{{.LOCAL_ENV}}'
+    - |
+      set -eu
+      "{{.OCPCTL}}" clusters kubeconfig export -e "{{.LOCAL_ENV}}" -n "{{.CLUSTER}}"
+    internal: true
+
+  cluster:apply:
+    desc: "  Apply resources to a local cluster."
+    requires:
+      vars:
+      - APPLY_DIR
+    cmds:
+    - task: env:validate
+      vars:
+        LOCAL_ENV: '{{.LOCAL_ENV}}'
+    - |
+      set -eu
+      kubectl apply --kubeconfig "{{.LOCAL_KUBECONFIG_DIR}}/{{.LOCAL_ENV}}/{{.CLUSTER}}.kubeconfig" -f "{{.APPLY_DIR}}"
+    internal: true
+
+  sp:command:
+    desc: "  Run a service-provider command in the local environment."
+    deps:
+    - provider:validate
+    requires:
+      vars:
+      - COMMAND
+    cmds:
+    - task: kubeconfig:export
+      vars:
+        LOCAL_ENV: '{{.LOCAL_ENV}}'
+    - |
+      set -eu
+      KUBECONFIG="{{.LOCAL_KUBECONFIG_DIR}}/{{.LOCAL_ENV}}/platform.kubeconfig" \
+      POD_NAMESPACE="{{.POD_NAMESPACE}}" \
+      DEV_DEBUG=true \
+      go run "{{.ROOT_DIR2}}/cmd/{{.LOCAL_PROVIDER_COMPONENT}}/main.go" "{{.COMMAND}}" \
+        --environment "{{.LOCAL_ENV}}" \
+        --provider-name "{{.LOCAL_PROVIDER_NAME}}" \
+        --verbosity DEBUG {{.COMMAND_ARGS}}
+    internal: true
