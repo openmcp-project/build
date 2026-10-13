@@ -57,8 +57,8 @@ tasks:
     run: once
     cmds:
     - |
-      set -eu 
-      test -n "{{.LOCAL_PROVIDER_NAME}}" || { echo "Set LOCAL_PROVIDER_NAME before running this task." >&2; exit 1; }'
+      set -eu
+      test -n "{{.LOCAL_PROVIDER_NAME}}" || { echo "Set LOCAL_PROVIDER_NAME before running this task." >&2; exit 1; }
     internal: true
 
   env:apply:
