@@ -31,7 +31,7 @@ on:
 
 jobs:
   homebrew-releaser:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     name: Update Homebrew Tap Formula
     steps:
       - name: Release project to Homebrew tap
