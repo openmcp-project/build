@@ -30,7 +30,7 @@ permissions:
 jobs:
   release_tag:
     name: Release version
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     environment: ${{ inputs.github-environment }}
     steps:
       - name: Create GitHub App token
