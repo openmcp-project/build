@@ -63,14 +63,6 @@ version: (( defaults.CD_VERSION ))
 provider:
   name: openmcp-project
 
-sources:
-- name: (( ( "tmp" = split("/", values.REPO_URL) ) element(tmp, length(tmp) - 1) ))
-  type: blob
-  version: (( values.VERSION ))
-  access:
-    type: gitHub
-    repoUrl: (( values.REPO_URL ))
-    commit: (( values.COMMIT ))
 resources:
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.BP_COMPONENTS))|[]|s,comp|-> s *templates.blueprint] ))
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.CHART_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "chart_version" = (cvs[1] || defaults.CHART_VERSION)) s *templates.chart] ))
