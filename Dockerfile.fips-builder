@@ -18,7 +18,7 @@
 #     -f Dockerfile.fips-builder .
 #
 # The binary is written to bin/<COMPONENT>.linux-fips-<ARCH> on the host.
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.27.2-bookworm@sha256:c1b6e50a944bc42c88c1c881e06527e1d29461c784cccf39a146de2eb9ec7795
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.27.3-bookworm@sha256:eb89c44ae1b5bdf97e3159a82c636f13c230620371bce16fc8c787ba64df9665
 ARG BUILDARCH
 ARG TARGETOS
 ARG TARGETARCH
