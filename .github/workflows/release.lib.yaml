@@ -1,4 +1,4 @@
-name: Versioned Release
+name: Semantic release
 
 on:
   workflow_call:
@@ -9,12 +9,12 @@ on:
         default: 1312871 # OpenMCP CI GitHub App
         type: string
       is_cli:
-        description: 'Indicates if this workflow is for a CLI tool (instead of a controller). If set, the built binaries will be attached to the release as artifacts.'
+        description: 'Build and attach CLI binaries to the prepared draft.'
         required: false
         default: false
         type: boolean
       github-environment:
-        description: 'Optionally define GitHub environment. By default, no GitHub environment is used.'
+        description: 'Optional GitHub environment, including any required release approvals.'
         required: false
         default: ""
         type: string
@@ -24,28 +24,43 @@ on:
         required: false
 
 permissions:
-  contents: write # we need this to be able to push tags
-  pull-requests: read
+  contents: write
+
+concurrency:
+  group: ${{ github.repository }}-semantic-release
+  cancel-in-progress: false
 
 jobs:
-  release_tag:
-    name: Release version
+  release:
+    name: ${{ github.event_name == 'release' && 'Process published release' || 'Update draft release' }}
     runs-on: ubuntu-26.04
     environment: ${{ inputs.github-environment }}
     steps:
+      - name: Require main push or published release
+        env:
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_ACTION: ${{ github.event.action }}
+        run: |
+          if [ "$RELEASE_EVENT" = release ]; then
+            test "$RELEASE_ACTION" = published
+          else
+            test "$RELEASE_EVENT" = push
+            test "$RELEASE_REF" = refs/heads/main
+          fi
+
       - name: Create GitHub App token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
         id: app-token
         with:
-          # required
           app-id: ${{ inputs.app_id }}
           private-key: ${{ case( secrets.app_private_key != '', secrets.app_private_key, secrets.OPENMCP_CI_APP_PRIVATE_KEY ) }}
 
-      - name: Checkout code
+      - name: Checkout latest main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: main
           token: ${{ steps.app-token.outputs.token }}
-          fetch-tags: true
           fetch-depth: 0
           submodules: recursive
 
@@ -54,86 +69,22 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: test-action
-        run: cd hack/common; git status
       - name: Install Task
         uses: arduino/setup-task@c0bc642852239c2689f73f4ea6459c29405f3c52 # v3.0.0
         with:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Read and validate VERSION
-        id: version
-        run: |
-          VERSION=$(task version)
-          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-dev(-[0-9a-f]*)?)?$ ]]; then
-            echo "Invalid version format: $VERSION"
-            exit 1
-          fi
-          echo "New version: $VERSION"
-          echo "version=$VERSION" >> $GITHUB_ENV
-
-      - name: Skip release if version is a dev version
-        if: contains(env.version, '-dev')
-        run: |
-          echo "Skipping development version release: ${{ env.version }}"
-          echo "SKIP=true" >> $GITHUB_ENV
-          exit 0
-
-      - name: Check if VERSION is already tagged
-        id: check_tag
-        run: |
-          if git rev-parse "refs/tags/${{ env.version }}" >/dev/null 2>&1; then
-            echo "Tag ${{ env.version }} already exists. Skipping release."
-            echo "SKIP=true" >> $GITHUB_ENV
-            exit 0
-          fi
-          echo "Tag ${{ env.version }} doesn't exists. Proceeding with release."
-
-      - name: Configure Git for GitHub Actions
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Create Git tag
-        if: ${{ env.SKIP != 'true' }}
-        run: |
-          git tag -a "${{ env.version }}" -m "Release ${{ env.version }}"
-          git push origin "${{ env.version }}"
-
-          NESTED_GO_MODULES="$(task release:list-nested-modules)"
-
-          for MODULE in $NESTED_GO_MODULES; do
-            git tag -a "${MODULE}/${{ env.version }}" -m "Release ${{ env.version }}"
-            git push origin "${MODULE}/${{ env.version }}"
-          done
-
-      - name: Generate release artifacts
-        if: ${{ ( env.SKIP != 'true' ) && inputs.is_cli }}
-        run: task r:artifacts --verbose  
-
-      - name: Build Changelog
-        if: ${{ env.SKIP != 'true' }}
-        id: github_release  
-        run: task r:generate-changelog
+      - name: Prepare draft or process publication
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create GitHub release
-        if: ${{ env.SKIP != 'true' }}
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
-        with:
-          tag_name: ${{ env.version }}
-          name: Release ${{ env.version }}
-          body_path: ./CHANGELOG.md
-          generate_release_notes: true
-          prerelease: false
-          files: ${{ fromJSON('["", "./bin/release/*"]')[inputs.is_cli] }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push dev VERSION
-        if: ${{ env.SKIP != 'true' }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_ID: ${{ github.event.release.id }}
+          IS_CLI: ${{ inputs.is_cli }}
         run: |
-          task r:prepare-dev-cycle --verbose
-          git push origin main
+          args=(draft)
+          if [ "$RELEASE_EVENT" = release ]; then
+            args=(post-publish --release-id "$RELEASE_ID")
+          fi
+          if [ "$IS_CLI" = true ]; then args+=(--is-cli); fi
+          node hack/common/release.cjs "${args[@]}"

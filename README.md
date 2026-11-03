@@ -216,9 +216,62 @@ This repository provides reusable GitHub Actions workflows that can be called fr
 |---|---|
 | `ci.lib.yaml` | Runs code generation, validation, and tests |
 | `publish.lib.yaml` | Builds and publishes images, charts, and OCM components. Accepts a `fips` input (default `true`); set it to `false` to build non-FIPS images and skip FIPS verification. |
-| `release.lib.yaml` | Creates releases and tags |
+| `release.lib.yaml` | Prepares a semantic draft and exact-version source on main pushes; creates nested-module tags and synchronizes main after publication in GitHub Releases. |
 | `renovate-generate.lib.yaml` | Runs `task generate` on Renovate branches and commits the result |
 | `homebrew.lib.yaml` | Makes the binary available via a custom homebrew tap (CLI variant only) |
+
+### Semantic drafts and GitHub Releases publication
+
+Call `release.lib.yaml` on pushes to `main` and on `release` events of type `published`. Pin the reusable workflow and `hack/common` submodule to the same build commit; `@main` below is an example placeholder.
+
+```yaml
+name: Release
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+permissions:
+  contents: write
+  packages: write
+jobs:
+  release:
+    uses: openmcp-project/build/.github/workflows/release.lib.yaml@main
+    secrets:
+      app_private_key: ${{ secrets.OPENMCP_CI_APP_PRIVATE_KEY }}
+  publish:
+    if: github.event_name == 'release'
+    needs: release
+    uses: openmcp-project/build/.github/workflows/publish.lib.yaml@main
+    secrets:
+      app_private_key: ${{ secrets.OPENMCP_CI_APP_PRIVATE_KEY }}
+```
+
+Every main push updates one automation-owned draft with generated commit notes. Before updating the draft, the workflow calls `task release:set-version` and creates a signed-off release commit on the dedicated automation-owned `automation/release-candidate` source branch. That commit contains the exact release `VERSION`, existing charts' `version`/`appVersion`/image tags, and actual nested-module dependency references. The draft targets that commit's SHA. For CLI consumers (`is_cli: true`), automation builds binaries from this exact candidate source and uploads assets before Publish, removing stale draft assets on refresh; immutable published releases are never modified. Draft preparation creates no tags and leaves source `main`, including its version files, untouched.
+
+The next version is calculated cumulatively from commits since the highest published stable root release whose recorded source-main SHA is reachable from `main` (for legacy releases, whose root tag is reachable from `main`): `feat` bumps minor; `type!` or a `BREAKING CHANGE:` / `BREAKING-CHANGE:` footer bumps major; other changes bump patch. Drafts, prereleases, unrelated release histories, and nested-module releases are not baselines. Without a published release, the baseline is `v0.0.0`. Only the largest increment applies, even across repeated draft updates. Workflow-owned release/development commits do not trigger another release.
+
+To release, wait for the draft-preparation workflow to succeed, then go to the consuming repository's **Releases > open the draft > Publish**. Review its version, notes, and prepared source before clicking. This matters especially for CLI assets: GitHub cannot atomically update a draft and upload all assets, and publishing early can freeze an incomplete immutable release. GitHub creates the root tag at the prepared source commit, so the released source already has the exact version files. The `release.published` event then:
+
+1. Validates the published root tag and creates tags for actual nested Go modules at the same release source commit.
+2. Merges the exact published commit into latest `main` with a merge commit, preserving its SHA and the release tag. It does not merge a newer candidate branch tip or recreate version changes. The tagged release becomes an ancestor of main.
+3. Creates a separate commit changing only `VERSION` to `<released-version>-dev`, leaving merged chart/module release versions intact. Both commits are pushed together with a normal fast-forward push.
+
+The Release workflow's `publish` job calls `publish.lib.yaml` only after the `release` post-processing job succeeds (`needs: release`). Images, charts, and OCM components are built from the published tag's prepared source, not latest main or the restored development commit. This sequencing ensures nested-module tags exist before artifact builds and blocks publication if source validation fails. Do not configure a separate simultaneous automatic Publish workflow; keep it manual-only for explicit artifact reruns. Check the Release workflow's post-processing and publish jobs before consuming artifacts.
+
+Published root tags never move. A merge conflict or concurrent main push stops post-processing without changing remote main. Resolve merge conflicts by merging the published tag into main normally (not squash/rebase), then rerun the failed published-event workflow; it will add the development-version commit if needed. An already completed run adds no commits on retry. Conflicting source/tag metadata requires remediation rather than retagging. The candidate branch is retained for future drafts; the tagged commit remains reachable through main even when that branch advances. Release jobs are serialized without interrupting in-progress post-processing.
+
+The GitHub App requires contents write access and permission to push the automation-owned release-candidate branch and main, and to create nested-module tags under branch/tag rules. The release, publish, and Renovate generation workflows retain the existing `app_private_key` secret input and its optional declaration (allowing a job environment to supply it). The token action still needs a key at runtime. Supply it explicitly as shown above, or inherit a secret already named `app_private_key`. `OPENMCP_CI_APP_PRIVATE_KEY` is only this organization's stored-secret name, mapped by the caller; shared workflows contain no fallback or second accepted key input. Callers already supplying `app_private_key` need no rename. The `app_id`, `github-environment`, and `is_cli` inputs remain supported.
+
+The public `release:patch`, `release:minor`, `release:major`, and `release:prepare-dev-cycle` tasks remain as non-mutating process guidance, including the current repository's Releases link (`REPO_URL`, or the origin remote). `release:set-version`, `release:list-nested-modules`, and artifact/changelog helpers remain available. Configure `NESTED_MODULES` only for folders containing a separate `go.mod`; repositories without their own chart or nested modules need no dummy configuration. Semantic major version selection does not migrate Go module paths; prepare such source changes before publishing a major release.
+
+Preview without changing GitHub or files, from a full current main checkout with Node.js 22+ and authenticated `gh`. The release engine uses only Node.js built-ins; no npm install is needed.
+
+```sh
+node hack/common/release.cjs plan --repo owner/repository
+```
+
+Run release behavior tests with `node --test hack/common/release.test.cjs` from a consuming repository. Tests use Node.js built-ins and isolated local Git/API fixtures; no GitHub credentials are required.
 
 ### Renovate: Auto-generate after dependency updates
 
@@ -241,7 +294,8 @@ permissions:
 jobs:
   generate:
     uses: openmcp-project/build/.github/workflows/renovate-generate.lib.yaml@main
-    secrets: inherit
+    secrets:
+      app_private_key: ${{ secrets.OPENMCP_CI_APP_PRIVATE_KEY }}
 ```
 
 Also add the following to the repository's `renovate.json`. This tells Renovate to ignore commits from `github-actions[bot]` when determining whether a branch has been modified externally, which is necessary to keep `:rebaseStalePrs` working correctly:
