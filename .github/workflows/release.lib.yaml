@@ -13,26 +13,6 @@ on:
         required: false
         default: false
         type: boolean
-      runner:
-        description: 'Runner label for the release job.'
-        required: false
-        default: ubuntu-26.04
-        type: string
-      use_github_token:
-        description: 'Use the caller GITHUB_TOKEN instead of a GitHub App token.'
-        required: false
-        default: false
-        type: boolean
-      install_task:
-        description: 'Install Task instead of using a Task binary already available on the runner.'
-        required: false
-        default: true
-        type: boolean
-      setup_go:
-        description: 'Set up Go instead of using a Go toolchain already available on the runner.'
-        required: false
-        default: true
-        type: boolean
       github-environment:
         description: 'Optional GitHub environment, including any required release approvals.'
         required: false
@@ -41,6 +21,9 @@ on:
     secrets:
       app_private_key:
         description: 'GitHub App private key for creating a GitHub App token.'
+        required: false
+      OPENMCP_CI_APP_PRIVATE_KEY:
+        description: 'Fallback GitHub App private key for creating a GitHub App token.'
         required: false
 
 permissions:
@@ -53,7 +36,7 @@ concurrency:
 jobs:
   release:
     name: ${{ github.event_name == 'release' && 'Process published release' || 'Update draft release' }}
-    runs-on: ${{ inputs.runner }}
+    runs-on: ubuntu-26.04
     environment: ${{ inputs.github-environment }}
     steps:
       - name: Require main push or published release
@@ -72,35 +55,35 @@ jobs:
       - name: Create GitHub App token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
         id: app-token
-        if: ${{ ! inputs.use_github_token }}
+        env:
+          USE_GITHUB_APP: ${{ secrets.app_private_key != '' || secrets.OPENMCP_CI_APP_PRIVATE_KEY != '' }}
+        if: ${{ env.USE_GITHUB_APP == 'true' }}
         with:
           app-id: ${{ inputs.app_id }}
-          private-key: ${{ secrets.app_private_key }}
+          private-key: ${{ case( secrets.app_private_key != '', secrets.app_private_key, secrets.OPENMCP_CI_APP_PRIVATE_KEY ) }}
 
       - name: Checkout latest main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: main
-          token: ${{ inputs.use_github_token && github.token || steps.app-token.outputs.token }}
+          token: ${{ steps.app-token.outputs.token || github.token }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Set up Go
-        if: ${{ inputs.setup_go }}
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
 
       - name: Install Task
-        if: ${{ inputs.install_task }}
         uses: arduino/setup-task@c0bc642852239c2689f73f4ea6459c29405f3c52 # v3.0.0
         with:
           version: 3.x
-          repo-token: ${{ inputs.use_github_token && '' || secrets.GITHUB_TOKEN }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Prepare draft or process publication
         env:
-          GH_TOKEN: ${{ inputs.use_github_token && github.token || steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
           RELEASE_EVENT: ${{ github.event_name }}
           RELEASE_ID: ${{ github.event.release.id }}
           IS_CLI: ${{ inputs.is_cli }}
