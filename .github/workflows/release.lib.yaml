@@ -28,6 +28,11 @@ on:
         required: false
         default: true
         type: boolean
+      setup_go:
+        description: 'Set up Go instead of using a Go toolchain already available on the runner.'
+        required: false
+        default: true
+        type: boolean
       github-environment:
         description: 'Optional GitHub environment, including any required release approvals.'
         required: false
@@ -81,6 +86,7 @@ jobs:
           submodules: recursive
 
       - name: Set up Go
+        if: ${{ inputs.setup_go }}
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
