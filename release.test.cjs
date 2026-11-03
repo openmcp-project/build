@@ -401,6 +401,18 @@ integration('Enterprise APIs and release-note links use the event server', (f) =
   assert.doesNotMatch(candidate.body, /https:\/\/github\.com\//);
 });
 
+integration('a merged feature pull request appears once in generated notes', (f) => {
+  f.git('switch', '-c', 'feat/greeting');
+  f.commit('feat: add greeting feature');
+  f.git('switch', 'main');
+  f.git('merge', '--no-ff', '-m', 'feat: add greeting feature', 'feat/greeting');
+  const candidate = f.plan();
+  assert.equal(candidate.version, 'v1.3.0');
+  assert.equal(candidate.commits.length, 1);
+  assert.equal(candidate.commits[0].message.split('\n')[0], 'feat: add greeting feature');
+  assert.equal((candidate.body.match(/add greeting feature/g) || []).length, 1);
+});
+
 integration('cumulative bump ignores drafts, prereleases, and nested releases', (f) => {
   f.commit('fix: repair old behavior');
   assert.equal(f.plan().version, 'v1.2.4');

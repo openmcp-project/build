@@ -127,7 +127,7 @@ function classify(message) {
 
 function commitsSince(base, head) {
   const revision = base ? `${base}..${head}` : head;
-  const fields = git(['log', '--reverse', '--format=%H%x00%ae%x00%B%x00', revision]).split('\0');
+  const fields = git(['log', '--first-parent', '--reverse', '--format=%H%x00%ae%x00%B%x00', revision]).split('\0');
   const result = [];
   for (let index = 0; index < fields.length - 2; index += 3) {
     const sha = fields[index];
