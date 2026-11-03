@@ -16,6 +16,7 @@ const BOT = 'github-actions[bot]';
 const EMAIL = 'github-actions[bot]@users.noreply.github.com';
 const CANDIDATE_BRANCH = 'automation/release-candidate';
 const OWNER_TRAILER = 'OpenMCP-Release-Candidate: ';
+const SERVER_URL = (process.env.GITHUB_SERVER_URL || `https://${process.env.GH_HOST || 'github.com'}`).replace(/\/$/, '');
 // Unlike $, the final assertion cannot accept a trailing newline.
 const VERSION = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?![\s\S])/;
 const SHA = /^[0-9a-f]{40,64}(?![\s\S])/;
@@ -263,7 +264,7 @@ function plan(repo, published, head) {
     const [level, kind, subject] = classify(item.message);
     const section = level === 3 ? 'Breaking changes' : kind === 'feat' ? 'Features'
       : kind === 'fix' || kind === 'perf' ? 'Fixes' : 'Other changes';
-    let entry = `- ${subject} ([${item.sha.slice(0, 7)}](https://github.com/${repo}/commit/${item.sha}))`;
+    let entry = `- ${subject} ([${item.sha.slice(0, 7)}](${SERVER_URL}/${repo}/commit/${item.sha}))`;
     if (level === 3 && item.message.includes('\n')) {
       entry += `\n${splitLines(item.message).slice(1).map(line => `  ${line}`).join('\n')}`;
     }
@@ -276,7 +277,7 @@ function plan(repo, published, head) {
     }
   }
   if (previous) {
-    notes.push(`**Full changelog:** https://github.com/${repo}/compare/${previous}...${head}`);
+    notes.push(`**Full changelog:** ${SERVER_URL}/${repo}/compare/${previous}...${head}`);
   }
   return { version, previous_tag: previous, target_commitish: head, commits, body: `${notes.join('\n\n')}\n` };
 }
@@ -712,6 +713,7 @@ function parseArguments(argv) {
 
 function main() {
   const args = parseArguments(process.argv.slice(2));
+  if (!process.env.GH_HOST) process.env.GH_HOST = new URL(SERVER_URL).host;
   const head = git(['rev-parse', 'HEAD']);
   ensureMain(head);
   let result;

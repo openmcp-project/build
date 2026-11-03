@@ -40,6 +40,9 @@ function fakeGh() {
   };
   const respond = (value) => { save(); if (value !== undefined) process.stdout.write(JSON.stringify(value)); };
   try {
+    if (process.env.RELEASE_TEST_EXPECTED_HOST) {
+      insist(process.env.GH_HOST === process.env.RELEASE_TEST_EXPECTED_HOST, 'Release API addressed the wrong GitHub instance');
+    }
     if (args[0] === 'release' && args[1] === 'upload') {
       const item = state.items.find((item) => item.tag_name === args[2]);
       insist(item && item.draft, 'Assets must never be uploaded after publication');
@@ -386,6 +389,16 @@ test('semver accepts stable root versions only', () => {
     'v1.2.3+build', 'api/v1.2.3', 'v1.2', 'v1.2.3\n', ' v1.2.3', '']) {
     assert.equal(semver(tag), null, tag);
   }
+});
+
+integration('Enterprise APIs and release-note links use the event server', (f) => {
+  f.env.GITHUB_SERVER_URL = 'https://github.example.test';
+  f.env.RELEASE_TEST_EXPECTED_HOST = 'github.example.test';
+  f.commit('fix: Enterprise release');
+  const candidate = f.plan();
+  assert.match(candidate.body, /https:\/\/github\.example\.test\/example\/project\/commit\//);
+  assert.match(candidate.body, /https:\/\/github\.example\.test\/example\/project\/compare\//);
+  assert.doesNotMatch(candidate.body, /https:\/\/github\.com\//);
 });
 
 integration('cumulative bump ignores drafts, prereleases, and nested releases', (f) => {

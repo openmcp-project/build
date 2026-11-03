@@ -267,6 +267,8 @@ The public `release:patch`, `release:minor`, `release:major`, and `release:prepa
 
 Preview without changing GitHub or files, from a full current main checkout with Node.js 22+ and authenticated `gh`. The release engine uses only Node.js built-ins; no npm install is needed.
 
+Release APIs and generated commit/changelog links use the Actions `GITHUB_SERVER_URL`. Outside Actions, set `GH_HOST` for GitHub Enterprise; otherwise the engine defaults to github.com.
+
 ```sh
 node hack/common/release.cjs plan --repo owner/repository
 ```
