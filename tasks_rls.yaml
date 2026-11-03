@@ -14,89 +14,65 @@ tasks:
       silent: true
 
   patch:
-    desc: "  Prepares a new patch release by creating a commit that will result in a patch release when pushed."
+    desc: "  Explains how to review the semantic draft and publish it in GitHub Releases."
     run: once
-    requires:
-      vars:
-      - VERSION
     cmds:
     - task: release-internal
-      vars:
-        RELEASE_VERSION:
-          sh: 'VERSION={{.VERSION}} "{{.TASKFILE_DIR2}}/compute-next-release-version.sh" patch'
 
   minor:
-    desc: "  Prepares a new minor release by creating a commit that will result in a minor release when pushed."
+    desc: "  Explains how to review the semantic draft and publish it in GitHub Releases."
     run: once
-    requires:
-      vars:
-      - VERSION
     cmds:
     - task: release-internal
-      vars:
-        RELEASE_VERSION:
-          sh: 'VERSION={{.VERSION}} "{{.TASKFILE_DIR2}}/compute-next-release-version.sh" minor'
 
   major:
-    desc: "  Prepares a new major release by creating a commit that will result in a major release when pushed."
+    desc: "  Explains how to review the semantic draft and publish it in GitHub Releases."
     run: once
-    requires:
-      vars:
-      - VERSION
     cmds:
     - task: release-internal
-      vars:
-        RELEASE_VERSION:
-          sh: 'VERSION={{.VERSION}} "{{.TASKFILE_DIR2}}/compute-next-release-version.sh" major'
-
-  prompt-changes:
-    desc: "  Causes a prompt if there are uncommitted changes which would be included in the release commit."
-    run: once
-    vars:
-      changes:
-        sh: '( cd "{{.ROOT_DIR2}}"; git status --short )'
-    if: 'test -n "$( cd "{{.ROOT_DIR2}}" && git status --porcelain=v1)"'
-    prompt:
-    - 'There are uncommitted changes in the working directory:{{"\n"}}{{.changes}}{{"\n\n"}}These changes will be included in the release commit, unless you stash, commit, or remove them otherwise before. Do you want to continue?'
-    internal: true
 
   prepare-dev-cycle:
-    desc: "  Prepares the repository for further development after a release. Creates a commit that adds a '-dev' suffix to the version. Meant to be run after a release commit has been pushed to the main branch."
+    desc: "  Explains the automated development-version restoration after publishing a release."
     run: once
-    requires:
-      vars:
-      - VERSION
-      - MODULE_NAME
-      - NESTED_MODULES
     cmds:
-    - task: set-version
-      vars:
-        CLI_ARGS: '{{.VERSION}}-dev'
-    - '( cd "{{.ROOT_DIR2}}"; git add VERSION go.mod; git commit -m "chore(release): prepare for next development iteration (version {{.VERSION}}-dev)" )'
+    - task: release-internal
 
   release-internal:
-    desc: "  Prepares a new release by creating a commit that will result in a release when pushed."
+    desc: "  Explains the semantic draft and GitHub Releases publication process without changing files."
     run: once
-    deps:
-    - prompt-changes
-    requires:
-      vars:
-      - RELEASE_VERSION
-    prompt:
-    - 'The release version will be {{.RELEASE_VERSION}}. Do you want to continue?'
+    vars:
+      RELEASES_URL:
+        sh: |
+          repo_url='{{.REPO_URL | default ""}}'
+          if [ -z "$repo_url" ]; then
+            repo_url=$(git -C "{{.ROOT_DIR2}}" remote get-url origin 2>/dev/null || true)
+            case "$repo_url" in
+              git@*:* ) repo_url=${repo_url#git@}; repo_url="https://${repo_url%%:*}/${repo_url#*:}" ;;
+              ssh://git@* ) repo_url="https://${repo_url#ssh://git@}" ;;
+            esac
+          fi
+          repo_url=${repo_url%/}
+          repo_url=${repo_url%.git}
+          case "$repo_url" in
+            https://*|http://*) printf '%s/releases\n' "$repo_url" ;;
+            *) printf '%s\n' 'the current repository Releases page (set REPO_URL to show its URL)' ;;
+          esac
     cmds:
-    - cmd: 'echo "Creating release commit for version {{.RELEASE_VERSION}} ..."'
+    - cmd: |
+        printf '%s\n' \
+          'Merges to main update a prepared semantic draft release; local version bumps are no longer used.' \
+          'Review the draft at {{.RELEASES_URL}}.' \
+          'To publish: GitHub Releases > open the draft > Publish.' \
+          'VERSION, charts and nested-module references are prepared on a release-candidate source branch before Publish; main stays untouched while drafting.' \
+          'The published event merges the exact tagged release into main, then creates a separate development VERSION commit; published tags stay on their original SHA.' \
+          'No local files or commits were changed.'
       silent: true
-    - vars:
-        CLI_ARGS: '{{.RELEASE_VERSION}}'
-      task: set-version
-    - '( cd "{{.ROOT_DIR2}}"; git add --all; git commit -m "chore(main): release {{.RELEASE_VERSION}}" )'
     internal: true
 
   set-version:
     desc: '  Updates all versions to the specified version. Usage: task {{.TASK}} -- <version>'
     summary: |
-      This task is called by the release tasks automatically.
+      This task prepares candidate source and sets the development VERSION after merging the published release.
       It sets the following versions to the one provided as argument:
       - the VERSION file in the root directory
       - 'version' in the Chart.yaml file of each component's helm chart
@@ -104,9 +80,6 @@ tasks:
       - 'tag' in the values.yaml file of each component's helm chart
       - the imported version of each nested module in the root go.mod file
     run: once
-    requires:
-      vars:
-      - MODULE_NAME
     preconditions:
     - sh: 'test "{{len .CLI_ARGS}}" -gt 0'
       msg: 'This task requires a version argument. Usage: task {{.TASK}} -- <version>'
@@ -127,7 +100,6 @@ tasks:
       vars:
         MODULE: '{{.ITEM}}'
         VERSION: '{{.VERSION}}'
-        MODULE_NAME: '{{.MODULE_NAME}}'
       task: set-module-version-internal
 
   set-chart-version-internal:
@@ -137,7 +109,7 @@ tasks:
       vars:
       - VERSION
       - COMPONENT
-    if: '{{ not ( .IS_CLI | default false ) }}' # skip this task for CLI repos, since they don't have charts
+    if: 'test -f "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml"'
     cmds:
     - '{{.TASKFILE_DIR2}}/sed.sh -E "s@version: v?[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+.*@version: {{.VERSION}}@1" "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml"'
     - '{{.TASKFILE_DIR2}}/sed.sh -E "s@appVersion: v?[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+.*@appVersion: {{.VERSION}}@1" "{{.ROOT_DIR2}}/charts/{{.COMPONENT}}/Chart.yaml"'
@@ -151,16 +123,21 @@ tasks:
       vars:
       - VERSION
       - MODULE
-      - MODULE_NAME
+    if: 'test -f "{{.ROOT_DIR2}}/{{.MODULE}}/go.mod"'
+    vars:
+      MODULE_PATH:
+        sh: |
+          if [ -f "{{.ROOT_DIR2}}/{{.MODULE}}/go.mod" ]; then
+            sed -nE 's/^module[[:blank:]]+([^[:blank:]]+).*/\1/p' "{{.ROOT_DIR2}}/{{.MODULE}}/go.mod"
+          fi
     cmds:
-    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@	{{.MODULE_NAME}}/{{.MODULE}}(/v[0-9]+)? v.*@	{{.MODULE_NAME}}/{{.MODULE}}\1 {{.VERSION}}@" "{{.ROOT_DIR2}}/go.mod"'
+    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@^([[:blank:]]*|require[[:blank:]]+)({{regexQuoteMeta .MODULE_PATH}})[[:blank:]]+v[^[:blank:]]+@\1\2 {{.VERSION}}@" "{{.ROOT_DIR2}}/go.mod"'
     - for:
         var: NESTED_MODULES
       vars:
         MODULE_TO_UPDATE: '{{.MODULE}}'
         MODULE_DEPENDENCY: '{{.ITEM}}'
         VERSION: '{{.VERSION}}'
-        MODULE_NAME: '{{.MODULE_NAME}}'
       task: set-nested-module-version-internal
     internal: true
 
@@ -172,15 +149,24 @@ tasks:
       - MODULE_TO_UPDATE
       - MODULE_DEPENDENCY
       - VERSION
-      - MODULE_NAME
+    if: 'test -f "{{.ROOT_DIR2}}/{{.MODULE_TO_UPDATE}}/go.mod" && test -f "{{.ROOT_DIR2}}/{{.MODULE_DEPENDENCY}}/go.mod"'
+    vars:
+      MODULE_PATH:
+        sh: |
+          if [ -f "{{.ROOT_DIR2}}/{{.MODULE_DEPENDENCY}}/go.mod" ]; then
+            sed -nE 's/^module[[:blank:]]+([^[:blank:]]+).*/\1/p' "{{.ROOT_DIR2}}/{{.MODULE_DEPENDENCY}}/go.mod"
+          fi
     cmds:
-    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@	{{.MODULE_NAME}}/{{.MODULE_DEPENDENCY}} v.*@	{{.MODULE_NAME}}/{{.MODULE_DEPENDENCY}} {{.VERSION}}@" "{{.ROOT_DIR2}}/{{.MODULE_TO_UPDATE}}/go.mod"'
+    - '{{.TASKFILE_DIR2}}/sed.sh -E "s@^([[:blank:]]*|require[[:blank:]]+)({{regexQuoteMeta .MODULE_PATH}})[[:blank:]]+v[^[:blank:]]+@\1\2 {{.VERSION}}@" "{{.ROOT_DIR2}}/{{.MODULE_TO_UPDATE}}/go.mod"'
     internal: true
 
   list-nested-modules:
-    desc: "List all nested modules in the project."
+    desc: "List configured nested Go modules that have a go.mod file."
     cmds:
-      - cmd: 'echo "{{.NESTED_MODULES}}"'
+    - for:
+        var: NESTED_MODULES
+      cmd: 'if [ -f "{{.ROOT_DIR2}}/{{.ITEM}}/go.mod" ]; then printf "%s\n" "{{.ITEM}}"; fi'
+      silent: true
 
   generate-changelog:
     desc: "  Generates an automated release changelog based on conventional-commits PR titles in CHANGELOG.md file."

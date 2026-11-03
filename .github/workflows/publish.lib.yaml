@@ -46,6 +46,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
           token: ${{ steps.app-token.outputs.token }}
           fetch-tags: true
           fetch-depth: 0
@@ -59,20 +60,26 @@ jobs:
 
       - name: Read and validate VERSION
         id: version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           VERSION=$(task version)
           if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-dev(-[0-9a-f]*)?)?$ ]]; then
             echo "Invalid version format: $VERSION"
             exit 1
           fi
+          if [ -n "$RELEASE_TAG" ] && [ "$VERSION" != "$RELEASE_TAG" ]; then
+            echo "Published tag $RELEASE_TAG does not match source VERSION $VERSION" >&2
+            exit 1
+          fi
           echo "New version: $VERSION"
-          echo "version=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> "$GITHUB_ENV"
 
       - name: Skip release if version is a dev version
         if: contains(env.version, '-dev')
         run: |
           echo "Skipping development version release: ${{ env.version }}"
-          echo "SKIP=true" >> $GITHUB_ENV
+          echo "SKIP=true" >> "$GITHUB_ENV"
           exit 0
 
       - name: Set up QEMU
