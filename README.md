@@ -237,19 +237,22 @@ permissions:
 jobs:
   release:
     uses: openmcp-project/build/.github/workflows/release.lib.yaml@main
-    secrets:
-      app_private_key: ${{ secrets.OPENMCP_CI_APP_PRIVATE_KEY }}
+    secrets: inherit
   publish:
     if: github.event_name == 'release'
     needs: release
     uses: openmcp-project/build/.github/workflows/publish.lib.yaml@main
-    secrets:
-      app_private_key: ${{ secrets.OPENMCP_CI_APP_PRIVATE_KEY }}
+    secrets: inherit
 ```
 
-Every main push updates one automation-owned draft with generated commit notes. Before updating the draft, the workflow calls `task release:set-version` and creates a signed-off release commit on the dedicated automation-owned `automation/release-candidate` source branch. That commit contains the exact release `VERSION`, existing charts' `version`/`appVersion`/image tags, and actual nested-module dependency references. The draft targets that commit's SHA. For CLI consumers (`is_cli: true`), automation builds binaries from this exact candidate source and uploads assets before Publish, removing stale draft assets on refresh; immutable published releases are never modified. Draft preparation creates no tags and leaves source `main`, including its version files, untouched.
+Every main push updates one automation-owned draft release with generated commit notes. Before updating the draft release, the workflow calls `task release:set-version` and creates a signed-off release commit on the dedicated automation-owned `automation/release-candidate` source branch. That commit contains the exact release `VERSION`, existing charts' `version`/`appVersion`/image tags, and actual nested-module dependency references. The draft release targets that commit's SHA. For CLI consumers (`is_cli: true`), automation builds binaries from this exact candidate source and uploads assets before Publish, removing stale draft assets on refresh; immutable published releases are never modified. Draft preparation creates no tags and leaves source `main`, including its version files, untouched.
 
-The next version is calculated cumulatively from commits since the highest published stable root release whose recorded source-main SHA is reachable from `main` (for legacy releases, whose root tag is reachable from `main`): `feat` bumps minor; `type!` or a `BREAKING CHANGE:` / `BREAKING-CHANGE:` footer bumps major; other changes bump patch. Drafts, prereleases, unrelated release histories, and nested-module releases are not baselines. Without a published release, the baseline is `v0.0.0`. Only the largest increment applies, even across repeated draft updates. Workflow-owned release/development commits do not trigger another release.
+The next version is calculated cumulatively from commits since the highest published stable root release whose recorded source-main SHA is reachable from `main` (for legacy releases, whose root tag is reachable from `main`): 
+ * `feat` bumps minor
+ * `type!` or a `BREAKING CHANGE:` / `BREAKING-CHANGE:` footer bumps major
+ * other changes bump patch. 
+
+Drafts, prereleases, unrelated release histories, and nested-module releases are not baselines. Without a published release, the baseline is `v0.0.0`. Only the largest increment applies, even across repeated draft updates. Workflow-owned release/development commits do not trigger another release.
 
 To release, wait for the draft-preparation workflow to succeed, then go to the consuming repository's **Releases > open the draft > Publish**. Review its version, notes, and prepared source before clicking. This matters especially for CLI assets: GitHub cannot atomically update a draft and upload all assets, and publishing early can freeze an incomplete immutable release. GitHub creates the root tag at the prepared source commit, so the released source already has the exact version files. The `release.published` event then:
 
@@ -259,11 +262,13 @@ To release, wait for the draft-preparation workflow to succeed, then go to the c
 
 The Release workflow's `publish` job calls `publish.lib.yaml` only after the `release` post-processing job succeeds (`needs: release`). Images, charts, and OCM components are built from the published tag's prepared source, not latest main or the restored development commit. This sequencing ensures nested-module tags exist before artifact builds and blocks publication if source validation fails. Do not configure a separate simultaneous automatic Publish workflow; keep it manual-only for explicit artifact reruns. Check the Release workflow's post-processing and publish jobs before consuming artifacts.
 
-Published root tags never move. A merge conflict or concurrent main push stops post-processing without changing remote main. Resolve merge conflicts by merging the published tag into main normally (not squash/rebase), then rerun the failed published-event workflow; it will add the development-version commit if needed. An already completed run adds no commits on retry. Conflicting source/tag metadata requires remediation rather than retagging. The candidate branch is retained for future drafts; the tagged commit remains reachable through main even when that branch advances. Release jobs are serialized without interrupting in-progress post-processing.
+Published root tags never move. A merge conflict or concurrent main push stops post-processing without changing remote `main`. Resolve merge conflicts by merging the published tag into main normally (not squash/rebase), then rerun the failed published-event workflow; it will add the development-version commit if needed. An already completed run adds no commits on retry. Conflicting source/tag metadata requires remediation rather than retagging. The candidate branch is retained for future drafts; the tagged commit remains reachable through main even when that branch advances. Release jobs are serialized without interrupting in-progress post-processing.
 
 The GitHub App requires contents write access and permission to push the automation-owned release-candidate branch and main, and to create nested-module tags under branch/tag rules. The release workflow uses the GitHub App when either `app_private_key` or `OPENMCP_CI_APP_PRIVATE_KEY` is available, preferring `app_private_key`; otherwise it uses the caller `GITHUB_TOKEN`. The established `app_private_key` declaration remains optional. The `app_id`, `github-environment`, and `is_cli` inputs remain supported.
 
-The public `release:patch`, `release:minor`, `release:major`, and `release:prepare-dev-cycle` tasks remain as non-mutating process guidance, including the current repository's Releases link (`REPO_URL`, or the origin remote). `release:set-version`, `release:list-nested-modules`, and artifact/changelog helpers remain available. Configure `NESTED_MODULES` only for folders containing a separate `go.mod`; repositories without their own chart or nested modules need no dummy configuration. Semantic major version selection does not migrate Go module paths; prepare such source changes before publishing a major release.
+The public `release:patch`, `release:minor`, `release:major`, and `release:prepare-dev-cycle` tasks remain as non-mutating process guidance, including the current repository's Releases link (`REPO_URL`, or the origin remote). `release:set-version`, `release:list-nested-modules`, and artifact/changelog helpers remain available. Semantic major version selection does not migrate Go module paths; prepare such source changes before publishing a major release.
+
+#### Debug and Dev
 
 Preview without changing GitHub or files, from a full current main checkout with Node.js 22+ and authenticated `gh`. The release engine uses only Node.js built-ins; no npm install is needed.
 

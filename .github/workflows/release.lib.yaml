@@ -22,9 +22,6 @@ on:
       app_private_key:
         description: 'GitHub App private key for creating a GitHub App token.'
         required: false
-      OPENMCP_CI_APP_PRIVATE_KEY:
-        description: 'Fallback GitHub App private key for creating a GitHub App token.'
-        required: false
 
 permissions:
   contents: write
