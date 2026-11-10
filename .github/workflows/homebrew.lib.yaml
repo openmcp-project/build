@@ -23,6 +23,11 @@ on:
         required: false
         default: false
         type: boolean
+      tag:
+        description: 'Release tag to use. Falls back to the tag from the release event if not specified.'
+        required: false
+        default: ''
+        type: string
     secrets:
       token:
         # It seems that the homebrew releaser action cannot handle app tokens, so we need to do this differently than for the other actions.
@@ -42,7 +47,7 @@ jobs:
 
           github_token: ${{ secrets.token }}
 
-          version: "${{ github.event.release.tag_name }}"
+          version: "${{ inputs.tag || github.event.release.tag_name }}"
 
           # This expects the binary contained in the release artifact tarball to be named as the repository.
           install: |
