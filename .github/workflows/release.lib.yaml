@@ -130,7 +130,7 @@ jobs:
           prerelease: false
           files: ${{ fromJSON('["", "./bin/release/*"]')[inputs.is_cli] }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: Push dev VERSION
         if: ${{ env.SKIP != 'true' }}
