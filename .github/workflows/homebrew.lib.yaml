@@ -28,6 +28,11 @@ on:
         required: false
         default: ''
         type: string
+      test:
+        description: 'Test command for the formula, used for `brew test`. Optional.'
+        required: false
+        default: ''
+        type: string
     secrets:
       token:
         # It seems that the homebrew releaser action cannot handle app tokens, so we need to do this differently than for the other actions.
@@ -52,6 +57,8 @@ jobs:
           # This expects the binary contained in the release artifact tarball to be named as the repository.
           install: |
             bin.install "${{ inputs.binary }}"
+
+          test: ${{ inputs.test }}
 
           # For each of these which is true, a corresponding <name>-<version(no v prefix)>-<os>-<arch>.tar.gz file containing a binary must be attached to the release.
           target_darwin_amd64: true
