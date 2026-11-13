@@ -32,8 +32,9 @@ tasks:
   build:
     desc: "  Build the image for $IMAGE_OS/$ARCH."
     summary: |
-      By default this builds a FIPS-compliant image: the FIPS binary (Microsoft Go +
-      GOEXPERIMENT=systemcrypto inside Docker) packaged onto a gardenlinux-fips runtime image.
+      By default this builds a FIPS-compliant image: a static binary with the FIPS 140-3 Go
+      Cryptographic Module linked in (upstream Go + GOFIPS140=certified), packaged onto a
+      gardenlinux-fips runtime image.
       Set 'FIPS=false' to instead build a standard (non-FIPS) static binary and package it
       onto a distroless runtime image.
       To overwrite the OS/arch, set the 'IMAGE_OS' and 'ARCH' environment variables.
@@ -229,10 +230,14 @@ tasks:
     desc: "  Verify FIPS compliance of built images."
     summary: |
       Runs two artifact-level checks against each built container image:
-      1. The component binary contains the Microsoft Go systemcrypto backend
-         (proves GOEXPERIMENT=systemcrypto was applied at build time).
-      2. The image ships a FIPS-validated OpenSSL library (libcrypto.so) for
-         the binary to dlopen at runtime.
+      1. The component binary links the FIPS 140-3 Go Cryptographic
+         Module and is static, so the crypto is in the binary and FIPS
+         mode is a property of the artifact.
+      2. The image ships a FIPS-validated OpenSSL library (libcrypto.so)
+         for the binary to dlopen at runtime.
+         The binary does not load it. It is a leftover from a previous
+         iteration with cgo-based builds and may be removed in a future
+         release.
       Kernel FIPS mode (/proc/sys/crypto/fips_enabled) is a property of the
       deployment host, not the image, and is therefore not checked here.
       Images must have been built before running this task.
@@ -292,38 +297,34 @@ tasks:
       IMG: '{{.IMAGE_BASE}}/{{.COMPONENT}}:{{.VERSION}}-{{.OS}}-{{.ARCH}}'
     cmds:
     - 'echo "Verifying FIPS compliance for {{.IMG}}"'
-    # [1/2] systemcrypto backend embedded in binary — runs on the HOST because
+    # [1/2] Go Cryptographic Module linked into the binary — runs on the HOST because
     # gardenlinux-fips does not include `strings` (or any of binutils/coreutils).
     # We copy the binary out of the image and inspect it with the host toolchain.
     - |
-      echo "--- [1/2] Go binary is wired to use the system OpenSSL ---"
+      echo "--- [1/2] binary carries the FIPS 140-3 Go Cryptographic Module ---"
       TMP=$(mktemp -d)
       trap 'rm -rf "$TMP"' EXIT
+      BIN="$TMP/{{.COMPONENT}}"
       CID=$(docker create --platform {{.OS}}/{{.ARCH}} "{{.IMG}}")
-      docker cp "$CID:/{{.COMPONENT}}" "$TMP/{{.COMPONENT}}" >/dev/null
+      docker cp "$CID:/{{.COMPONENT}}" "${BIN}" >/dev/null
       docker rm "$CID" >/dev/null
-      # Microsoft Go's `systemcrypto` build mode compiles a shim into the binary
-      # that dlopens the system OpenSSL at runtime and routes all crypto/* calls
-      # through it. There is no "Microsoft OpenSSL" — the actual crypto lib is
-      # whatever libcrypto.so the runtime image ships (in our case, gardenlinux-fips).
-      # ldd does not reveal this because the linkage happens via dlopen, not at
-      # link time. So we scan the binary for the shim's symbols instead.
-      if command -v strings >/dev/null 2>&1; then
-        SCAN="strings $TMP/{{.COMPONENT}}"
-      else
-        SCAN="grep -aoE [[:print:]]+ $TMP/{{.COMPONENT}}"
-      fi
-      if $SCAN | grep -qE "crypto/internal/backend/openssl|openssl\.provider|openssl\.Hash"; then
-        echo "OK: binary contains the systemcrypto shim — crypto/* calls will be routed to the system OpenSSL"
-      else
-        echo "FAIL: binary does not contain the systemcrypto shim — GOEXPERIMENT=systemcrypto was not applied at build time"
-        exit 1
-      fi
-    # [2/2] OpenSSL is present AND configured for FIPS in the image.
-    # gardenlinux-fips ships an openssl.cnf that loads the FIPS provider and
-    # sets `default_properties = fips=yes`, so every consumer of libcrypto in
-    # the image gets FIPS crypto by default. We verify all three: the library,
-    # the FIPS provider module, and the config wiring.
+      # GOFIPS140 is written to the build settings only when FIPS mode is enabled at build
+      # time, so `latest`, `inprocess`, `certified` and a pinned `v<semver>` all appear and
+      # unset/`off` leave nothing behind.
+      MOD=$(grep -aoE 'GOFIPS140=[^[:space:]]+' "$BIN" 2>/dev/null | head -n1 || true)
+      case "$MOD" in
+        "" | GOFIPS140= | GOFIPS140=off)
+          echo "FAIL: no FIPS 140-3 module built in — GOFIPS140 is unset or off"
+          exit 1
+          ;;
+      esac
+      echo "  module: $MOD"
+      echo "OK: FIPS 140-3 crypto is compiled into the binary (GOFIPS140)"
+    # [2/2] the runtime OS is still FIPS-configured, even though the binary does not
+    # use its OpenSSL. gardenlinux-fips ships an openssl.cnf that loads the FIPS
+    # provider and sets `default_properties = fips=yes`, so any other consumer of
+    # libcrypto in the image gets FIPS crypto by default. We verify all three: the
+    # library, the FIPS provider module, and the config wiring.
     - |
       docker run --rm --platform {{.OS}}/{{.ARCH}} --entrypoint /bin/sh "{{.IMG}}" -c '
         echo "--- [2/2] OpenSSL present and FIPS-configured in image ---"
@@ -334,7 +335,7 @@ tasks:
           [ -e "$lib" ] && echo "  lib: $lib"
         done
         if ! ls /usr/lib/*/libcrypto.so* >/dev/null 2>&1; then
-          echo "FAIL: libcrypto not found — the binary cannot dlopen OpenSSL at runtime"
+          echo "FAIL: libcrypto not found — the runtime OS is no longer FIPS-configured"
           fail=1
         fi
 
