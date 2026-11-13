@@ -101,11 +101,11 @@ tasks:
       task: build
 
   build-fips:
-    desc: '  Build FIPS-compliant binary for $OS/$ARCH using Microsoft Go + GOEXPERIMENT=systemcrypto.'
+    desc: '  Build FIPS-compliant binary for $OS/$ARCH with the upstream Go toolchain.'
     summary: |
-      Builds a FIPS-compliant binary using the Microsoft Go toolchain inside Docker.
-      The binary is compiled with GOEXPERIMENT=systemcrypto so that all crypto/* calls
-      are routed through the system OpenSSL (gardenlinux-fips) via dlopen at runtime.
+      Builds a FIPS-compliant binary using the upstream Go toolchain inside Docker.
+      The binary is compiled with GOFIPS140=certified, which links the FIPS 140-3 Go
+      Cryptographic Module and enables FIPS mode at build time.
       Cross-compilation is fully handled inside the Docker builder image — no special
       host toolchain required beyond Docker.
       The binary is saved in the 'bin' folder, as $COMPONENT.$OS-$ARCH.
@@ -138,18 +138,13 @@ tasks:
       - BUILD_DATE
       - MODULE_NAME
       - DOCKERFILE_FIPS_BUILDER
-    vars:
-      BUILDARCH:
-        sh: 'docker info --format "{{"{{"}}json .Architecture{{"}}"}}" | tr -d "\"" | sed "s/x86_64/amd64/;s/aarch64/arm64/"'
     cmds:
     - for:
         var: COMPONENTS
         as: COMPONENT
       cmd: >
         docker buildx build
-        --platform linux/{{.BUILDARCH}}
         --target export
-        --build-arg BUILDARCH={{.BUILDARCH}}
         --build-arg TARGETOS={{.OS}}
         --build-arg TARGETARCH={{.ARCH}}
         --build-arg COMPONENT={{.COMPONENT}}
