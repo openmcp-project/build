@@ -96,7 +96,10 @@ Since the imported Taskfile is generic, there are a few variables that need to b
   - If this is set to `true`, the `test` task will include the `setup-envtest` tooling in its dependencies and download it automatically.
 - `FIPS`
   - Controls whether container images are built FIPS-compliant. Defaults to `true`.
-  - When `true` (the default), the binary is built with the Microsoft Go toolchain (`GOEXPERIMENT=systemcrypto`) and packaged onto the `gardenlinux-fips` runtime image; `build:img:verify-fips` checks compliance.
+  - When `true` (the default), the binary is built with the upstream Go toolchain and
+    `GOFIPS140=certified`, which links the FIPS 140-3 Go Cryptographic Module into the
+    static binary. It is packaged onto the `gardenlinux-fips` runtime image
+    `build:img:verify-fips` checks compliance.
   - When set to `false`, a standard static (`CGO_ENABLED=0`) binary is built and packaged onto a distroless runtime image (`Dockerfile.nonfips`), and `build:img:verify-fips` is skipped.
   - This is set as an environment variable, e.g. `FIPS=false task build:img:all`. In CI, the `publish.lib.yaml` reusable workflow exposes a matching `fips` input (see below).
 
