@@ -18,11 +18,19 @@ on:
         required: false
         default: true
         type: boolean
+      signature_name:
+        description: 'OCM signature name consumers must expect. Defaults to <owner>.<repo> of the calling repository.'
+        required: false
+        default: ""
+        type: string
     secrets:
       app_private_key:
         description: 'GitHub App private key for creating a GitHub App token.'
         required: false
-  
+      signing_key:
+        description: 'Optional RSA private key (or the path to one) used to sign the published images with cosign. Publishing is unsigned when it is not set.'
+        required: false
+
 permissions:
   packages: write
 
@@ -106,6 +114,7 @@ jobs:
           task build:img:all --verbose
         env:
           FIPS: ${{ inputs.fips }}
+          SIGNING_KEY: ${{ secrets.signing_key }}
 
       - name: Verify FIPS compliance
         if: ${{ inputs.fips }}
@@ -119,3 +128,7 @@ jobs:
       - name: Build and Push OCM Component
         run: |
           task build:ocm:all --verbose
+        env:
+          SIGNING_KEY: ${{ secrets.signing_key }}
+          # Default the signature name to <owner>.<repo> so a caller only has to set the signing_key secret.
+          SIGNING_NAME: ${{ inputs.signature_name != '' && inputs.signature_name || format('{0}.{1}', github.repository_owner, github.event.repository.name) }}

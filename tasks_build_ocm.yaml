@@ -14,11 +14,13 @@ tasks:
       silent: true
 
   all:
-    desc: "  Builds and pushes the OCM component."
+    desc: "  Builds, signs and pushes the OCM component."
     run: once
     cmds:
     - task: build
+    - task: sign
     - task: push
+    - task: verify
 
   build:
     desc: "  Build the OCM component."
@@ -39,6 +41,10 @@ tasks:
         sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --image'
       COMMIT:
         sh: '( cd "{{.ROOT_DIR2}}"; git rev-parse HEAD )'
+      # Components whose SBOMs were written by 'signing.sh sign-images'. signing.sh also fails
+      # the build when signing is on but a component's SBOMs are missing.
+      sbom_components:
+        sh: 'SBOM="{{.SBOM}}" SBOM_DIR="{{.SBOM_DIR}}" "{{.TASKFILE_DIR2}}/signing.sh" sbom-components {{ if .IMG_COMPONENTS }}{{.IMG_COMPONENTS | replace "," " "}}{{ else }}{{.COMPONENTS}}{{ end }}'
       compdir: '{{.LOCALTMP}}/component'
     cmds:
     - |
@@ -58,7 +64,9 @@ tasks:
         IMG_COMPONENTS="{{.IMG_COMPONENTS | default ""}}" \
         CRDS_COMPONENTS="{{.CRDS_COMPONENTS | default "[]"}}" \
         CRDS_VERSION="{{.CRDS_VERSION | default ""}}" \
-        CRDS_PATH="{{.CRDS_PATH | default ""}}"
+        CRDS_PATH="{{.CRDS_PATH | default ""}}" \
+        SBOM_COMPONENTS="{{.sbom_components}}" \
+        SBOM_PATH="{{.SBOM_DIR}}"
     - cmd: echo "Use '$(realpath --relative-base="{{.USER_WORKING_DIR}}" "{{.OCM}}") get cv $(realpath --relative-base="{{.USER_WORKING_DIR}}" "{{.compdir}}") -o yaml' to view the generated component descriptor."
       silent: true
 
@@ -78,4 +86,63 @@ tasks:
         sh: 'if [[ -n ${OVERWRITE_COMPONENTS:-} ]] && [[ ${OVERWRITE_COMPONENTS} != "false" ]]; then echo -n "--overwrite"; fi'
       compdir: '{{.LOCALTMP}}/component'
     cmds:
-    - '"{{.OCM}}" transfer componentversions "{{.compdir}}" "{{.COMPONENT_REGISTRY}}" {{.overwrite_mod}}'
+    - cmd: |
+        # A registry can answer 404 for a manifest it tagged microseconds earlier, which fails
+        # the transfer of an already signed component version. The transfer is idempotent.
+        attempts=3
+        delay=10
+        for attempt in $(seq 1 "$attempts"); do
+          if "{{.OCM}}" transfer componentversions "{{.compdir}}" "{{.COMPONENT_REGISTRY}}" {{.overwrite_mod}}; then
+            exit 0
+          fi
+          echo "Could not transfer the component version (attempt $attempt of $attempts)." 1>&2
+          if [[ "$attempt" != "$attempts" ]]; then sleep "$delay"; fi
+        done
+        exit 1
+
+  sign:
+    desc: "  Sign the OCM component version in the local transport archive. It must have been built before."
+    summary: |
+      Signs with 'ocm sign' before the transfer.
+      Requires SIGNING_KEY, either the RSA private key itself or the path to one, and SIGNING_NAME, the signature name.
+      Without a signing key, or with SIGN=false, the task does nothing.
+    run: once
+    # signing.sh owns the decision, so the taskfile does not restate its rules.
+    if: '"{{.TASKFILE_DIR2}}/signing.sh" enabled'
+    deps:
+    - tools:ocm
+    requires:
+      vars:
+      - VERSION
+      - MODULE_NAME
+      - LOCALTMP
+    vars:
+      compdir: '{{.LOCALTMP}}/component'
+    env:
+      SIGN: '{{.SIGN}}'
+      SIGNING_KEY: '{{.SIGNING_KEY}}'
+      SIGNING_NAME: '{{.SIGNING_NAME}}'
+      OCM: '{{.OCM}}'
+    cmds:
+    - '"{{.TASKFILE_DIR2}}/signing.sh" sign-cv "{{.compdir}}" "{{ lower .MODULE_NAME }}" "{{.VERSION}}"'
+
+  verify:
+    desc: "  Verify the signature of the component version in the registry. It must have been signed and pushed before."
+    run: once
+    if: '"{{.TASKFILE_DIR2}}/signing.sh" enabled'
+    deps:
+    - tools:ocm
+    requires:
+      vars:
+      - VERSION
+      - MODULE_NAME
+    vars:
+      COMPONENT_REGISTRY:
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --component'
+    env:
+      SIGN: '{{.SIGN}}'
+      SIGNING_KEY: '{{.SIGNING_KEY}}'
+      SIGNING_NAME: '{{.SIGNING_NAME}}'
+      OCM: '{{.OCM}}'
+    cmds:
+    - '"{{.TASKFILE_DIR2}}/signing.sh" verify-cv "{{.COMPONENT_REGISTRY}}" "{{ lower .MODULE_NAME }}" "{{.VERSION}}"'

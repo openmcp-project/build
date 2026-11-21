@@ -170,6 +170,49 @@ tasks:
     - 'mv "{{.tmpdir}}/ocm" "{{.OCM}}"'
     internal: true
 
+  cosign:
+    desc: "  Ensure that the cosign CLI is installed."
+    run: once
+    requires:
+      vars:
+      - COSIGN
+    deps:
+    - localbin
+    vars:
+      # renovate: datasource=github-releases depName=cosign packageName=sigstore/cosign
+      COSIGN_VERSION: '{{ env "COSIGN_VERSION" | default ( .COSIGN_VERSION | default "v3.1.4" ) }}'
+    status:
+    - 'test -x "{{.COSIGN}}"'
+    - '"{{.COSIGN}}" version | grep -q "{{.COSIGN_VERSION}}"'
+    cmds:
+    - 'curl -sfL "https://github.com/sigstore/cosign/releases/download/{{.COSIGN_VERSION}}/cosign-{{.OS}}-{{.ARCH}}" --output "{{.COSIGN}}"'
+    - 'chmod +x "{{.COSIGN}}"'
+    internal: true
+
+  syft:
+    desc: "  Ensure that the syft CLI is installed."
+    run: once
+    requires:
+      vars:
+      - SYFT
+    deps:
+    - localbin
+    vars:
+      # renovate: datasource=github-releases depName=syft packageName=anchore/syft
+      SYFT_VERSION: '{{ env "SYFT_VERSION" | default ( .SYFT_VERSION | default "1.57.2" ) }}'
+      tmpdir:
+        sh: 'mktemp -d'
+    status:
+    - 'test -x "{{.SYFT}}"'
+    - '"{{.SYFT}}" version | grep -q "{{.SYFT_VERSION}}"'
+    cmds:
+    - 'curl -sfL "https://github.com/anchore/syft/releases/download/v{{.SYFT_VERSION}}/syft_{{.SYFT_VERSION}}_{{.OS}}_{{.ARCH}}.tar.gz" --output "{{.tmpdir}}/syft.tar.gz"'
+    - 'tar -xzf "{{.tmpdir}}/syft.tar.gz" --directory "{{.tmpdir}}" syft'
+    - 'mv "{{.tmpdir}}/syft" "{{.SYFT}}"'
+    - 'chmod +x "{{.SYFT}}"'
+    - 'rm -rf "{{.tmpdir}}"'
+    internal: true
+
   envtest:
     desc: "  Ensure that envtest is installed."
     run: once

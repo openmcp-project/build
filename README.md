@@ -102,6 +102,21 @@ Since the imported Taskfile is generic, there are a few variables that need to b
     `build:img:verify-fips` checks compliance.
   - When set to `false`, a standard static (`CGO_ENABLED=0`) binary is built and packaged onto a distroless runtime image (`Dockerfile.nonfips`), and `build:img:verify-fips` is skipped.
   - This is set as an environment variable, e.g. `FIPS=false task build:img:all`. In CI, the `publish.lib.yaml` reusable workflow exposes a matching `fips` input (see below).
+- `SIGNING_KEY`
+  - The RSA private key used to sign the published container images and the OCM component version, either the key itself or the path of a file holding it.
+  - If unset artifacts are published unchanged.
+  - See [Artifact Signing](#artifact-signing) below.
+- `SIGN`
+  - Set to `false` to disable signing even when `SIGNING_KEY` is available.
+  - Also an environment variable.
+- `SIGNING_NAME`
+  - Name of the signature on the OCM component version.
+  - Required whenever signing is enabled: there is no default, and consumers have to know the name to verify.
+  - Also an environment variable.
+- `SBOM`
+  - SBOMs are generated whenever signing is enabled.
+  - Set to `false` to publish signatures without SBOMs.
+  - Also an environment variable. See [Artifact Signing](#artifact-signing) below.
 
 There are two main Taskfiles, one of which should be included:
 - `Taskfile_controller.yaml` is meant for operator repositories and contains task definitions for code generation and validation, binary builds, and image builds.
@@ -218,7 +233,7 @@ This repository provides reusable GitHub Actions workflows that can be called fr
 | Workflow | Purpose |
 |---|---|
 | `ci.lib.yaml` | Runs code generation, validation, and tests |
-| `publish.lib.yaml` | Builds and publishes images, charts, and OCM components. Accepts a `fips` input (default `true`); set it to `false` to build non-FIPS images and skip FIPS verification. |
+| `publish.lib.yaml` | Builds and publishes images, charts, and OCM components. Accepts a `fips` input (default `true`); set it to `false` to build non-FIPS images and skip FIPS verification. Set the optional `signing_key` secret to sign the published images and the OCM component version, and the optional `signature_name` input to override the component version signature name (see [Artifact Signing](#artifact-signing)). |
 | `release.lib.yaml` | Creates releases and tags |
 | `renovate-generate.lib.yaml` | Runs `task generate` on Renovate branches and commits the result |
 | `homebrew.lib.yaml` | Makes the binary available via a custom homebrew tap (CLI variant only) |
@@ -293,6 +308,74 @@ TABLE HERE
 > For some reason, the action computes the table _before_ adding the calling repo's formula and it fails if there are no formulae within the tap, which means
 >   - table generation must be disabled for the first run, if the homebrew tap repo does not have any formulae yet
 >   - when a new formula is added, it will only appear in the table when the workflow is run again _after_ the run that added the new formula
+
+## Artifact Signing
+
+Published container images can be signed with [cosign](https://github.com/sigstore/cosign), the OCM component version with `ocm sign`.
+Artifacts are signed automatically when a signing key is available. One key signs both, and the SBOMs of the images are generated and attached in the same step.
+
+### What is signed
+
+Each component's multi-platform manifest (`<image-registry>/<component>:<version>`), addressed by its digest - the reference that the OCM component version points at. `task build:img:all` signs after pushing and verifies what it signed. Signatures and SBOM attestations are attached to the digest, so every tag of the same manifest shares them.
+
+The OCM component version. `task build:ocm:all` signs it in the local transport archive before pushing, so the signature covers the local resources and the digests of the referenced images and charts, then verifies the signature in the registry.
+
+### Enabling it
+
+| Variable | Purpose |
+|---|---|
+| `SIGNING_KEY` | RSA private key, either the key itself or the path of a file holding it. A value that names an existing file is read as a path, anything else as the key itself. |
+| `SIGN` | `false` disables signing even when `SIGNING_KEY` is set. |
+| `SIGNING_NAME` | Name of the component version signature. Required when signing is enabled, there is no default. Consumers must verify with the same name. |
+| `SBOM` | `false` disables SBOM generation and attestation. On by default whenever signing is on. |
+| `SBOM_DIR` | Directory the SBOM documents are written to. Defaults to `<LOCALTMP>/sbom`. |
+
+```sh
+openssl genrsa -out signing.key 4096
+openssl pkey -in signing.key -pubout -out signing.pub   # publish this part
+```
+
+In CI, set the `signing_key` secret of the publishing repository; `publish.lib.yaml` hands it to the image and component build steps as `SIGNING_KEY`. The component version signature name defaults to `<owner>.<repo>` of the calling repository (for example `openmcp-project.control-plane-operator`), override it with the `signature_name` input. Without the secret the workflow publishes unsigned artifacts. Signing authenticates to the registry with the same docker configuration as pushing, so no additional credentials are involved.
+
+### SBOMs
+
+After signing an image, `task build:img:sign-multi` scans it with [syft](https://github.com/anchore/syft) and writes two documents per component to `SBOM_DIR/<component>/`: `sbom-cyclonedx.json` (CycloneDX 1.7 JSON) and `sbom-spdx.json` (SPDX 2.3 JSON). Both are then attached to the image as cosign attestations, and `task build:ocm:build` adds both to the component version as resources named `<component>-sbom-cyclonedx` and `<component>-sbom-spdx`. Every consumer therefore finds the SBOMs either next to the image or inside the component version.
+
+The component version is signed after its SBOM resources are added, so the signature covers their digests: changing a single SBOM byte changes the component version digest and invalidates the signature.
+
+Because the SBOMs of a component are produced while its image is signed, the component version build needs the image signing step to have run first. `task build:ocm:build` fails naming the missing components when signing is on and a component's SBOMs are absent; `SBOM=false` builds a component version without them. Signing authenticates to the registry with the same docker configuration as pushing, so no additional credentials are involved.
+
+### Verifying an image
+
+```sh
+IMG=ghcr.io/openmcp-project/images/<component>:<version>
+DIG=$(docker buildx imagetools inspect "$IMG" --format '{{.Manifest.Digest}}')
+cosign verify --key signing.pub "$IMG@$DIG"
+cosign verify-attestation --key signing.pub --type cyclonedx "$IMG@$DIG"
+cosign verify-attestation --key signing.pub --type spdxjson "$IMG@$DIG"
+cosign tree "$IMG@$DIG"
+```
+
+`cosign tree` lists the signature and attestation artifacts that refer to the image; `cosign verify` prints the verified image manifest claims, `cosign verify-attestation` the verified SBOM.
+
+### Verifying a component version
+
+```sh
+ocm verify componentversions --signature openmcp-project --public-key signing.pub \
+  ghcr.io/openmcp-project/components//<go module>:<version>
+```
+
+The SBOMs of a component version can be extracted with:
+
+```sh
+ocm download resources <go module>:<version> -t sbom --repo ghcr.io/openmcp-project/components -O ./sboms
+```
+
+### Republishing a signed version
+
+Every build of a component version gets a new digest, because its creation time is part of what is signed. Publishing a version again with the key signs it again. Publishing it again **without** the key leaves the old signature on a component version it no longer matches, and verification fails until the version is published with the key once more.
+
+Once the registry holds a signed version, publishing a changed version of it (for example one that gained SBOM resources) needs `OVERWRITE_COMPONENTS=true`. Without it the transfer stops with `component version … already exists`, and the unsigned or older copy in the registry keeps verifying against the old digest.
 
 ## Documentation Generation
 

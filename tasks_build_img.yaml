@@ -4,6 +4,9 @@ includes:
   build:bin:
     taskfile: tasks_build_bin.yaml
     internal: true
+  tools:
+    taskfile: tasks_tools.yaml
+    internal: true
 
 vars:
   DOCKER_BUILDER_NAME:
@@ -226,6 +229,41 @@ tasks:
     - 'docker manifest push {{.IMG}}'
     internal: true
 
+  sign-multi:
+    desc: "  Sign the multi-platform images with cosign and attach their SBOMs."
+    summary: |
+      Signs each component's multi-platform manifest by its digest and verifies the
+      signature against the public key derived from the signing key. Images that already
+      carry a signature from this key are left alone.
+      Then scans each signed image with syft, writes a CycloneDX and an SPDX document to
+      SBOM_DIR, attaches both to the image as cosign attestations, and verifies them.
+      Set SBOM=false to sign without generating SBOMs.
+      Requires SIGNING_KEY, either the RSA private key itself or the path to one.
+      Without a signing key, or with SIGN=false, the task does nothing.
+    run: once
+    if: '"{{.TASKFILE_DIR2}}/signing.sh" enabled'
+    deps:
+    - tools:cosign
+    requires:
+      vars:
+      - COMPONENTS
+      - VERSION
+    vars:
+      IMAGE_BASE:
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --image'
+    env:
+      SIGN: '{{.SIGN}}'
+      SIGNING_KEY: '{{.SIGNING_KEY}}'
+      COSIGN: '{{.COSIGN}}'
+      SBOM: '{{.SBOM}}'
+      SBOM_DIR: '{{.SBOM_DIR}}'
+      SYFT: '{{.SYFT}}'
+    cmds:
+    # signing.sh needs syft only when it generates SBOMs, so the install is not unconditional.
+    - task: tools:syft
+      if: '{{ eq .SBOM "true" }}'
+    - '"{{.TASKFILE_DIR2}}/signing.sh" sign-images "{{.IMAGE_BASE}}" "{{.VERSION}}" {{.COMPONENTS}}'
+
   verify-fips:
     desc: "  Verify FIPS compliance of built images."
     summary: |
@@ -403,7 +441,8 @@ tasks:
       cmd: 'docker buildx imagetools create "{{.IMAGE_BASE}}/{{.COMPONENT}}:{{.VERSION}}" --tag "{{.IMAGE_BASE}}/{{.COMPONENT}}:{{.TAG}}"'
 
   all:
-    desc: "  Build FIPS-compliant binaries and images for multiple operating systems and architectures and push them to the registry."
+    desc: "  Build FIPS-compliant binaries and images for multiple operating systems and architectures, sign them and push them to the registry."
     cmds:
     - task: build-multi
     - task: push-multi
+    - task: sign-multi

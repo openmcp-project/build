@@ -56,6 +56,14 @@
 #   - Defaults to COMPONENTS if not specified.
 #   - Set this to "[]" to not add any images to the component descriptor.
 #   - Each image's version defaults to IMG_VERSION if not specified.
+# - SBOM_COMPONENTS
+#   - Comma-separated list of components for which the SBOM documents written by signing.sh should be added to the component descriptor, optionally with version (separated by ":").
+#   - Each element will result in two resource entries of type 'sbom' named '<component>-sbom-cyclonedx' and '<component>-sbom-spdx', read from '<SBOM_PATH>/<component>/sbom-cyclonedx.json' and '<SBOM_PATH>/<component>/sbom-spdx.json'.
+#   - Set this to "[]" (the default) to not add any SBOMs to the component descriptor.
+#   - Each SBOM's version defaults to IMG_VERSION if not specified.
+# - SBOM_PATH
+#   - Path to the directory holding the per-component SBOM directories. Must be specified if SBOM_COMPONENTS is set.
+#   - Must be absolute: a relative input path is resolved against the directory of this file, which is the vendored library directory in a consuming repository.
 
 
 name: (( lower(values.MODULE_NAME) ))
@@ -68,6 +76,8 @@ resources:
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.CHART_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "chart_version" = (cvs[1] || defaults.CHART_VERSION)) s *templates.chart] ))
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.IMG_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "img_version" = (cvs[1] || defaults.IMG_VERSION)) s *templates.image] ))
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.CRDS_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "crds_version" = (cvs[1] || defaults.CRDS_VERSION)) s *templates.crds] ))
+- <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.SBOM_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "sbom_version" = (cvs[1] || defaults.IMG_VERSION)) s *templates.sbomCyclonedx] ))
+- <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.SBOM_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "sbom_version" = (cvs[1] || defaults.IMG_VERSION)) s *templates.sbomSpdx] ))
 
 
 # ##########################################################################
@@ -83,6 +93,7 @@ defaults:
   IMG_COMPONENTS: (( funcs.notEmpty(values.IMG_COMPONENTS || "") ? values.IMG_COMPONENTS :values.COMPONENTS ))
   CRDS_COMPONENTS: (( funcs.notEmpty(values.CRDS_COMPONENTS || "") ? values.CRDS_COMPONENTS :values.COMPONENTS ))
   CRDS_VERSION: (( funcs.notEmpty(values.CRDS_VERSION || "") ? values.CRDS_VERSION :values.VERSION ))
+  SBOM_COMPONENTS: (( funcs.notEmpty(values.SBOM_COMPONENTS || "") ? values.SBOM_COMPONENTS :"[]" ))
 
 funcs:
   <<<: (( &temporary ))
@@ -123,6 +134,24 @@ templates:
     input:
       type: dir
       path: (( values.CRDS_PATH ))
+  sbomCyclonedx:
+    <<<: (( &template ))
+    name: (( comp "-sbom-cyclonedx" ))
+    type: sbom
+    version: (( sbom_version ))
+    input:
+      type: file
+      path: (( values.SBOM_PATH "/" comp "/sbom-cyclonedx.json" ))
+      mediaType: application/vnd.cyclonedx+json
+  sbomSpdx:
+    <<<: (( &template ))
+    name: (( comp "-sbom-spdx" ))
+    type: sbom
+    version: (( sbom_version ))
+    input:
+      type: file
+      path: (( values.SBOM_PATH "/" comp "/sbom-spdx.json" ))
+      mediaType: application/spdx+json
 
 
 
