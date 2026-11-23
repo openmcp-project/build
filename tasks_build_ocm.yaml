@@ -61,17 +61,19 @@ tasks:
       CRDS_PATH: '{{.CRDS_PATH | default ""}}'
       CONSTRUCTOR_BASE_DIR: '{{.TASKFILE_DIR2}}'
       CONSTRUCTOR_FILE: '{{.LOCALTMP}}/component-constructor.yaml'
+      SOURCE_ARCHIVE: '{{.LOCALTMP}}/source.tar'
       ROOT_DIR2: '{{.ROOT_DIR2}}'
       LOCALTMP: '{{.LOCALTMP}}'
       OCM_COMPONENT_DIR: '{{.compdir}}'
     cmds:
+    - 'git archive --format=tar --output="$SOURCE_ARCHIVE" -- "${COMMIT:-HEAD}"'
     # Binding files preserve strings containing '=' or leading zeros, unlike spiff -D.
     - |
       "{{.JQ}}" -n '{values: (env | {
         VERSION, MODULE_NAME, REPO_URL, COMMIT, COMPONENTS,
         CHART_REGISTRY, IMG_REGISTRY, CD_VERSION, CHART_VERSION, IMG_VERSION,
         BP_PATH, BP_COMPONENTS, CHART_COMPONENTS, IMG_COMPONENTS,
-        CRDS_COMPONENTS, CRDS_VERSION, CRDS_PATH, CONSTRUCTOR_BASE_DIR
+        CRDS_COMPONENTS, CRDS_VERSION, CRDS_PATH, CONSTRUCTOR_BASE_DIR, SOURCE_ARCHIVE
       })}' > "$LOCALTMP/component-values.json"
     - '"{{.SPIFF}}" merge --features control,interpolation --bindings "$LOCALTMP/component-values.json" "{{.TASKFILE_DIR2}}/components.yaml" > "$CONSTRUCTOR_FILE"'
     # Transferring the whole archive must not republish versions left by earlier builds.
