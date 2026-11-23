@@ -25,6 +25,7 @@ on:
   
 permissions:
   packages: write
+  id-token: write # keyless signing with the workflow identity
 
 env:
   OCI_URL: ghcr.io/openmcp-project
@@ -106,6 +107,8 @@ jobs:
           task build:img:all --verbose
         env:
           FIPS: ${{ inputs.fips }}
+          SIGNING_IDENTITY: https://github.com/${{ job.workflow_ref }}
+          SIGNING_ISSUER: https://token.actions.githubusercontent.com
 
       - name: Verify FIPS compliance
         if: ${{ inputs.fips }}
@@ -119,3 +122,6 @@ jobs:
       - name: Build and Push OCM Component
         run: |
           task build:ocm:all --verbose
+        env:
+          SIGNING_IDENTITY: https://github.com/${{ job.workflow_ref }}
+          SIGNING_ISSUER: https://token.actions.githubusercontent.com
