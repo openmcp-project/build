@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 
-# Generates CycloneDX and SPDX SBOMs for every platform of every image in the component.
+# Generates CycloneDX and SPDX SBOMs for every platform of every image in the component
+# and attests them to the scanned image.
 #
 # Environment:
 #   JQ, SYFT    tool binaries
+#   sign.sh environment for the attestations
 #   LOCALTMP    holds component-resources.json and component-values.json,
 #               receives sbom/, sboms.jsonl and component-sbom-values.json
 
@@ -131,6 +133,7 @@ image_sboms() {
 
         log "Scanning $repo@$child ($platform)"
         scan "$repo" "$child" "$platform" "$directory" || die "Cannot scan $repo@$child"
+        "$(dirname "$0")/sign.sh" attest "$repo@$child" "$directory" || exit 1
         record "$name" "$version" "$reference" "$pinned" "$child" "$platform" "$directory" >> "$records" ||
             die "Cannot record SBOMs of $repo@$child"
     done < "$LOCALTMP/platforms.tsv"

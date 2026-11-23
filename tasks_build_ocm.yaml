@@ -14,11 +14,13 @@ tasks:
       silent: true
 
   all:
-    desc: "  Builds and pushes the OCM component."
+    desc: "  Builds, signs, pushes and verifies the OCM component."
     run: once
     cmds:
     - task: build
+    - task: sign
     - task: push
+    - task: verify
 
   build:
     desc: "  Render the constructor template and build the OCM component."
@@ -29,6 +31,7 @@ tasks:
     - tools:spiff
     - tools:jq
     - tools:syft
+    - tools:cosign
     - tools:localtmp
     requires:
       vars:
@@ -65,6 +68,9 @@ tasks:
       SOURCE_ARCHIVE: '{{.LOCALTMP}}/source.tar'
       JQ: '{{.JQ}}'
       SYFT: '{{.SYFT}}'
+      COSIGN: '{{.COSIGN}}'
+      SIGNING_IDENTITY: '{{.SIGNING_IDENTITY}}'
+      SIGNING_ISSUER: '{{.SIGNING_ISSUER}}'
       ROOT_DIR2: '{{.ROOT_DIR2}}'
       LOCALTMP: '{{.LOCALTMP}}'
       OCM_COMPONENT_DIR: '{{.compdir}}'
@@ -106,3 +112,48 @@ tasks:
       OCM_TARGET: '{{.COMPONENT_REGISTRY}}'
     cmds:
     - '"{{.OCM}}" transfer cv "$OCM_SOURCE" "$OCM_TARGET"'
+
+  sign:
+    desc: "  Sign the OCM component in the local archive. It must have been built before."
+    run: once
+    deps:
+    - tools:ocm
+    - tools:cosign
+    requires:
+      vars:
+      - VERSION
+      - MODULE_NAME
+      - LOCALTMP
+    env:
+      OCM: '{{.OCM}}'
+      COSIGN: '{{.COSIGN}}'
+      SIGNING_IDENTITY: '{{.SIGNING_IDENTITY}}'
+      SIGNING_ISSUER: '{{.SIGNING_ISSUER}}'
+      SIGNING_NAME: '{{.SIGNING_NAME}}'
+      LOCALTMP: '{{.LOCALTMP}}'
+    cmds:
+    - '"{{.TASKFILE_DIR2}}/sign.sh" cv "ctf::{{.LOCALTMP}}/component//{{lower .MODULE_NAME}}:{{.CD_VERSION | default .VERSION}}"'
+
+  verify:
+    desc: "  Verify the signature of the OCM component in the registry. It must have been pushed before."
+    run: once
+    deps:
+    - tools:ocm
+    - tools:cosign
+    requires:
+      vars:
+      - VERSION
+      - MODULE_NAME
+      - LOCALTMP
+    vars:
+      COMPONENT_REGISTRY:
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" "{{.TASKFILE_DIR2}}/get-registry.sh" --component'
+    env:
+      OCM: '{{.OCM}}'
+      COSIGN: '{{.COSIGN}}'
+      SIGNING_IDENTITY: '{{.SIGNING_IDENTITY}}'
+      SIGNING_ISSUER: '{{.SIGNING_ISSUER}}'
+      SIGNING_NAME: '{{.SIGNING_NAME}}'
+      LOCALTMP: '{{.LOCALTMP}}'
+    cmds:
+    - '"{{.TASKFILE_DIR2}}/sign.sh" verify-cv "{{.COMPONENT_REGISTRY}}//{{lower .MODULE_NAME}}:{{.CD_VERSION | default .VERSION}}"'
