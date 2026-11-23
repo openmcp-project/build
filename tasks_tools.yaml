@@ -149,6 +149,29 @@ tasks:
     - 'chmod +x "{{.YAML2JSON}}"'
     internal: true
 
+  spiff:
+    desc: "  Ensure that spiff is installed."
+    run: once
+    requires:
+      vars:
+      - SPIFF
+    deps:
+    - localbin
+    vars:
+      # renovate: datasource=github-releases depName=spiff packageName=mandelsoft/spiff
+      SPIFF_VERSION: '{{ env "SPIFF_VERSION" | default ( .SPIFF_VERSION | default "v1.7.0-beta-10" ) }}'
+    status:
+    - 'test -x "{{.SPIFF}}"'
+    - '"{{.SPIFF}}" --version | grep -Fxq "spiff version {{.SPIFF_VERSION}}"'
+    cmds:
+    - |
+      tmpdir="$(mktemp -d)" || exit 1
+      finish() { rm -rf "$tmpdir"; }
+      trap finish EXIT
+      GOBIN="$tmpdir" go install github.com/mandelsoft/spiff@{{.SPIFF_VERSION}} || exit 1
+      mv "$tmpdir/spiff" "{{.SPIFF}}"
+    internal: true
+
   ocm:
     desc: "  Ensure that the ocm CLI is installed."
     run: once
