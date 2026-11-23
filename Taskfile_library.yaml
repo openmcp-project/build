@@ -70,6 +70,7 @@ vars:
   HELM: '{{ .HELM | default (print .LOCALBIN "/helm") }}'
   YAML2JSON: '{{ .YAML2JSON | default (print .LOCALBIN "/yaml2json") }}'
   OCM: '{{ .OCM | default (print .LOCALBIN "/ocm") }}'
+  SPIFF: '{{ .SPIFF | default (print .LOCALBIN "/spiff") }}'
   ENVTEST: '{{ .ENVTEST | default (print .LOCALBIN "/setup-envtest") }}'
 
   # separator strings
@@ -110,14 +111,14 @@ tasks:
     run: once
     deps:
     - generate:all
-  
+
   test:
     desc: "  Run all tests."
     summary: This is an alias for 'validate:test'.
     run: once
     deps:
     - validate:test
-  
+
   validate:
     desc: "  Combines all validation tasks except for tests."
     summary: This is an alias for 'validate:all'.
@@ -127,7 +128,7 @@ tasks:
     - check
     deps:
     - validate:validate
-  
+
   version:
     desc: "  Print the version of the project. Use VERSION_OVERRIDE to make this task print a specific version."
     run: once
