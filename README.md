@@ -195,6 +195,70 @@ tasks:
     internal: true
 ```
 
+### OCM Component, SBOMs and Signing
+
+`build:ocm:all` builds, signs, pushes and verifies one OCM component version for the repository. Besides the images, charts and CRDs it contains:
+- `source`: a `git archive` of the built commit.
+- `<component>-image-sbom-cyclonedx` and `<component>-image-sbom-spdx`: one pair of SBOMs per image and platform, generated with [syft](https://github.com/anchore/syft).
+
+Images reference the digest of the pushed image instead of its tag. Pushing a component version that already exists replaces it, unless the registry forbids it.
+
+Everything is signed keyless with [Sigstore](https://www.sigstore.dev/). There are no signing keys and there is no unsigned mode:
+- `build:img:all` signs each multi-platform image.
+- `build:ocm:build` attests both SBOMs to the platform image they describe.
+- `build:ocm:sign` signs the component version.
+
+Each signature is verified right after it is created. Signatures and the signer identity are recorded in the public Sigstore transparency log.
+
+The following variables control signing. They can be set as environment variables.
+- `SIGNING_IDENTITY`
+  - Identity the signing certificate must carry. Required.
+- `SIGNING_ISSUER`
+  - OIDC issuer of that identity. Required.
+- `SIGNING_NAME`
+  - Name of the signature on the component version. Defaults to `default`.
+
+The `publish.lib.yaml` workflow sets identity and issuer to its own workflow identity. Outside of CI, `cosign` opens the Sigstore login in a browser and the logged-in user signs, so identity and issuer have to match that login:
+```shell
+SIGNING_IDENTITY=jane.doe@example.org SIGNING_ISSUER=https://github.com/login/oauth task build:ocm:all
+```
+
+#### Verifying Published Artifacts
+
+Artifacts published with the [publish action](#publish-action) are signed by the workflow that published them, at the ref it ran for. For a release published by a tag push:
+```shell
+identity=https://github.com/openmcp-project/<repo>/.github/workflows/publish.yaml@refs/tags/<version>
+issuer=https://token.actions.githubusercontent.com
+```
+
+Artifacts published through the reusable `publish.lib.yaml` workflow are signed by that workflow instead, at the ref the repository calls it with. The identity does not name the publishing repository and changes whenever that ref is updated:
+```shell
+identity=https://github.com/openmcp-project/build/.github/workflows/publish.lib.yaml@<ref>
+```
+
+Image and SBOM attestations, the latter per platform image digest:
+```shell
+cosign verify --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" ghcr.io/openmcp-project/images/<component>:<version>
+cosign verify-attestation --type cyclonedx --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" ghcr.io/openmcp-project/images/<component>@<platform-digest>
+cosign verify-attestation --type spdxjson --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" ghcr.io/openmcp-project/images/<component>@<platform-digest>
+```
+
+Component version, with the expected signer in an OCM configuration file:
+```yaml
+# signing.yaml
+type: generic.config.ocm.software/v1
+configurations:
+- type: signing.config.ocm.software/v1alpha1
+  signature: default
+  verifier:
+    type: SigstoreVerificationConfiguration/v1alpha1
+    certificateIdentity: https://github.com/openmcp-project/<repo>/.github/workflows/publish.yaml@refs/tags/<version>
+    certificateOIDCIssuer: https://token.actions.githubusercontent.com
+```
+```shell
+OCM_CONFIG=signing.yaml ocm verify cv --signature default ghcr.io/openmcp-project/components//<module>:<version>
+```
+
 ### Makefile
 
 This repo contains a dummy Makefile that for any command prints the instructions for installing `task`:
@@ -222,6 +286,52 @@ This repository provides reusable GitHub Actions workflows that can be called fr
 | `release.lib.yaml` | Creates releases and tags |
 | `renovate-generate.lib.yaml` | Runs `task generate` on Renovate branches and commits the result |
 | `homebrew.lib.yaml` | Makes the binary available via a custom homebrew tap (CLI variant only) |
+
+### Publish Action
+
+The composite action `.github/actions/publish` builds, signs and publishes images, charts and the OCM component. It runs inside the job of the calling workflow, so the signatures carry the identity of that workflow instead of this repository's. It always produces fips builds.
+
+The calling job checks out the repository with submodules and grants the permission to request the signing identity:
+
+```yaml
+# .github/workflows/publish.yaml
+name: Publish
+
+on:
+  push:
+    tags:
+      - v*
+  workflow_dispatch:
+
+jobs:
+  release_publish:
+    runs-on: ubuntu-26.04
+    permissions:
+      packages: write
+      id-token: write
+    steps:
+      - name: Create GitHub App token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
+        id: app-token
+        with:
+          app-id: 1312871 # OpenMCP CI GitHub App
+          private-key: ${{ secrets.OPENMCP_CI_APP_PRIVATE_KEY }}
+
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-tags: true
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Publish
+        uses: ./hack/common/.github/actions/publish
+```
+
+See [Verifying Published Artifacts](#verifying-published-artifacts) for the resulting signer identity.
+
+`publish.lib.yaml` remains for the transition. It needs `id-token: write` on the calling job as well, and signs as `https://github.com/openmcp-project/build/.github/workflows/publish.lib.yaml@<ref it is called with>`.
 
 ### Renovate: Auto-generate after dependency updates
 
