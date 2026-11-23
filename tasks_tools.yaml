@@ -178,19 +178,24 @@ tasks:
     requires:
       vars:
       - OCM
+      - OS
+      - ARCH
     deps:
     - localbin
     status:
     - 'test -x "{{.OCM}}"'
-    - '"{{.OCM}}" --version | grep -q "{{.OCM_VERSION | trimPrefix "v"}}"'
+    - '"{{.OCM}}" version | grep -q "OCM CLI (Open Component Model v2)"'
+    - '"{{.OCM}}" version | grep -Fxq "  Version:  {{.OCM_VERSION | trimPrefix "v"}}"'
     vars:
-      # renovate: datasource=github-releases depName=ocm packageName=open-component-model/ocm
-      OCM_VERSION: '{{ env "OCM_VERSION" | default ( .OCM_VERSION | default "v0.55.0" ) }}'
+      # renovate: datasource=github-releases depName=ocm packageName=open-component-model/open-component-model
+      OCM_VERSION: '{{ env "OCM_VERSION" | default ( .OCM_VERSION | default "v0.25.0" ) }}'
       tmpdir:
         sh: 'mktemp -d'
     cmds:
-    - 'curl -sSfL https://ocm.software/install.sh | OCM_VERSION="{{.OCM_VERSION | trimPrefix "v"}}" bash -s "{{.tmpdir}}"'
+    - 'curl -fsSL "https://github.com/open-component-model/open-component-model/releases/download/v{{.OCM_VERSION | trimPrefix "v"}}/ocm-{{.OS}}-{{.ARCH}}" --output "{{.tmpdir}}/ocm"'
+    - 'chmod +x "{{.tmpdir}}/ocm"'
     - 'mv "{{.tmpdir}}/ocm" "{{.OCM}}"'
+    - 'rmdir "{{.tmpdir}}"'
     internal: true
 
   envtest:

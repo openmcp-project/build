@@ -1,12 +1,16 @@
 # TODO: Refactor this.
 #
-# Usage:
-# 
-# Feed arguments into ocm CLI like this:
-#   ocm add componentversions ... -- CHART_REGISTRY=... IMG_REGISTRY=...
+# OCM v2 lacks Spiff support, so Task renders this constructor first.
+#
+# Now - this is NOT nice. DO NOT DO THIS. Just write discrete component constructors and build those.
+# However the build repo is being used by a lot of repositories and the
+# machinery relied on dynamic nature the spiff templating to handle
+# automatically building the constructor. As an interim solution to get
+# to OCM v2 the build repo does the spiff templating manually and then
+# builds with OCM v2.
 #
 # Required values:
-# - VERSION (set via the ocm CLI's --version flag)
+# - VERSION
 #   - Used as version for the source element pointing to this repo.
 #   - Used as referenced GitHub release, if it does not contain a '-dev'.
 #   - Used as fallback value for other versions.
@@ -97,15 +101,15 @@ templates:
     name: (( comp "-blueprint" ))
     type: landscaper.gardener.cloud/blueprint
     input:
-      path: (( "../blueprints/" comp ))
-      type: dir
+      path: (( values.CONSTRUCTOR_BASE_DIR "/../blueprints/" comp ))
+      type: Dir/v1
   chart:
     <<<: (( &template ))
     name: (( comp "-chart" ))
     type: helmChart
     version: (( chart_version ))
     access:
-      type: ociArtifact
+      type: OCIImage/v1
       imageReference: (( values.CHART_REGISTRY "/" comp ":" chart_version ))
   image:
     <<<: (( &template ))
@@ -114,15 +118,15 @@ templates:
     version: (( img_version ))
     access:
       imageReference: (( values.IMG_REGISTRY "/" comp ":" img_version ))
-      type: ociArtifact
+      type: OCIImage/v1
   crds:
     <<<: (( &template ))
     name: (( comp "-crds" ))
     type: fileSystem
     version: (( crds_version ))
     input:
-      type: dir
-      path: (( values.CRDS_PATH ))
+      type: Dir/v1
+      path: (( substr(values.CRDS_PATH, 0, 1) == "/" ? values.CRDS_PATH :values.CONSTRUCTOR_BASE_DIR "/" values.CRDS_PATH ))
 
 
 
