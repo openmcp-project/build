@@ -72,6 +72,7 @@ vars:
   OCM: '{{ .OCM | default (print .LOCALBIN "/ocm") }}'
   SPIFF: '{{ .SPIFF | default (print .LOCALBIN "/spiff") }}'
   SYFT: '{{ .SYFT | default (print .LOCALBIN "/syft") }}'
+  COSIGN: '{{ .COSIGN | default (print .LOCALBIN "/cosign") }}'
   ENVTEST: '{{ .ENVTEST | default (print .LOCALBIN "/setup-envtest") }}'
 
   # separator strings

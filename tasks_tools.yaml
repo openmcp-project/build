@@ -149,6 +149,27 @@ tasks:
     - 'chmod +x "{{.YAML2JSON}}"'
     internal: true
 
+  cosign:
+    desc: "  Ensure that cosign is installed."
+    run: once
+    requires:
+      vars:
+      - COSIGN
+      - OS
+      - ARCH
+    deps:
+    - localbin
+    vars:
+      # renovate: datasource=github-releases depName=cosign packageName=sigstore/cosign
+      COSIGN_VERSION: '{{ env "COSIGN_VERSION" | default ( .COSIGN_VERSION | default "v3.1.4" ) }}'
+    status:
+    - 'test -x "{{.COSIGN}}"'
+    - '"{{.COSIGN}}" version 2>&1 | grep -Eq ''^GitVersion: +{{.COSIGN_VERSION}}$'''
+    cmds:
+    - 'curl -fsSL "https://github.com/sigstore/cosign/releases/download/{{.COSIGN_VERSION}}/cosign-{{.OS}}-{{.ARCH}}" --output "{{.COSIGN}}"'
+    - 'chmod +x "{{.COSIGN}}"'
+    internal: true
+
   syft:
     desc: "  Ensure that syft is installed."
     run: once
