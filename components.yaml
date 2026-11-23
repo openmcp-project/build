@@ -80,6 +80,8 @@ resources:
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.CHART_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "chart_version" = (cvs[1] || defaults.CHART_VERSION)) s *templates.chart] ))
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.IMG_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "img_version" = (cvs[1] || defaults.IMG_VERSION)) s *templates.image] ))
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.CRDS_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "crds_version" = (cvs[1] || defaults.CRDS_VERSION)) s *templates.crds] ))
+- <<<: (( sum[values.SBOMS || []|[]|s,b|-> ("sbom_format" = "cyclonedx") s *templates.sbom] ))
+- <<<: (( sum[values.SBOMS || []|[]|s,b|-> ("sbom_format" = "spdx") s *templates.sbom] ))
 
 
 # ##########################################################################
@@ -125,7 +127,7 @@ templates:
     type: ociImage
     version: (( img_version ))
     access:
-      imageReference: (( values.IMG_REGISTRY "/" comp ":" img_version ))
+      imageReference: (( values.IMAGE_REFERENCES.[values.IMG_REGISTRY "/" comp ":" img_version] || values.IMG_REGISTRY "/" comp ":" img_version ))
       type: OCIImage/v1
   crds:
     <<<: (( &template ))
@@ -135,6 +137,18 @@ templates:
     input:
       type: Dir/v1
       path: (( substr(values.CRDS_PATH, 0, 1) == "/" ? values.CRDS_PATH :values.CONSTRUCTOR_BASE_DIR "/" values.CRDS_PATH ))
+  sbom:
+    <<<: (( &template ))
+    name: (( b.name "-sbom-" sbom_format ))
+    type: sbom
+    version: (( b.version ))
+    extraIdentity:
+      platform: (( b.platform ))
+      image-digest: (( b.digest ))
+    input:
+      type: File/v1
+      path: (( b.directory "/sbom-" sbom_format ".json" ))
+      mediaType: (( sbom_format == "cyclonedx" ? "application/vnd.cyclonedx+json" :"application/spdx+json" ))
 
 
 

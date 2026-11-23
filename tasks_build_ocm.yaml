@@ -28,6 +28,7 @@ tasks:
     - tools:ocm
     - tools:spiff
     - tools:jq
+    - tools:syft
     - tools:localtmp
     requires:
       vars:
@@ -62,6 +63,8 @@ tasks:
       CONSTRUCTOR_BASE_DIR: '{{.TASKFILE_DIR2}}'
       CONSTRUCTOR_FILE: '{{.LOCALTMP}}/component-constructor.yaml'
       SOURCE_ARCHIVE: '{{.LOCALTMP}}/source.tar'
+      JQ: '{{.JQ}}'
+      SYFT: '{{.SYFT}}'
       ROOT_DIR2: '{{.ROOT_DIR2}}'
       LOCALTMP: '{{.LOCALTMP}}'
       OCM_COMPONENT_DIR: '{{.compdir}}'
@@ -76,6 +79,9 @@ tasks:
         CRDS_COMPONENTS, CRDS_VERSION, CRDS_PATH, CONSTRUCTOR_BASE_DIR, SOURCE_ARCHIVE
       })}' > "$LOCALTMP/component-values.json"
     - '"{{.SPIFF}}" merge --features control,interpolation --bindings "$LOCALTMP/component-values.json" "{{.TASKFILE_DIR2}}/components.yaml" > "$CONSTRUCTOR_FILE"'
+    - '"{{.SPIFF}}" convert --json --path resources "$CONSTRUCTOR_FILE" > "$LOCALTMP/component-resources.json"'
+    - '"{{.TASKFILE_DIR2}}/generate-sboms.sh"'
+    - '"{{.SPIFF}}" merge --features control,interpolation --bindings "$LOCALTMP/component-sbom-values.json" "{{.TASKFILE_DIR2}}/components.yaml" > "$CONSTRUCTOR_FILE"'
     # Transferring the whole archive must not republish versions left by earlier builds.
     - 'rm -rf -- "$OCM_COMPONENT_DIR"'
     - '"{{.OCM}}" add cv --constructor "$CONSTRUCTOR_FILE" --repository "ctf::$OCM_COMPONENT_DIR" --working-directory "$ROOT_DIR2" --blob-cache-directory "$LOCALTMP/ocm-cache"'
