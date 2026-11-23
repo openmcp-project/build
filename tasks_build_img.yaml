@@ -4,6 +4,9 @@ includes:
   build:bin:
     taskfile: tasks_build_bin.yaml
     internal: true
+  tools:
+    taskfile: tasks_tools.yaml
+    internal: true
 
 vars:
   DOCKER_BUILDER_NAME:
@@ -402,8 +405,30 @@ tasks:
         as: COMPONENT
       cmd: 'docker buildx imagetools create "{{.IMAGE_BASE}}/{{.COMPONENT}}:{{.VERSION}}" --tag "{{.IMAGE_BASE}}/{{.COMPONENT}}:{{.TAG}}"'
 
+  sign-multi:
+    desc: "  Sign the multi-platform images. Images must have been pushed before."
+    deps:
+    - tools:cosign
+    vars:
+      IMAGE_BASE:
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --image'
+    requires:
+      vars:
+      - COMPONENTS
+      - VERSION
+    env:
+      COSIGN: '{{.COSIGN}}'
+      SIGNING_IDENTITY: '{{.SIGNING_IDENTITY}}'
+      SIGNING_ISSUER: '{{.SIGNING_ISSUER}}'
+    cmds:
+    - for:
+        var: COMPONENTS
+        as: COMPONENT
+      cmd: '"{{.TASKFILE_DIR2}}/sign.sh" image "{{.IMAGE_BASE}}/{{.COMPONENT}}:{{.VERSION}}"'
+
   all:
-    desc: "  Build FIPS-compliant binaries and images for multiple operating systems and architectures and push them to the registry."
+    desc: "  Build FIPS-compliant binaries and images for multiple operating systems and architectures, push them to the registry and sign them."
     cmds:
     - task: build-multi
     - task: push-multi
+    - task: sign-multi
