@@ -149,6 +149,32 @@ tasks:
     - 'chmod +x "{{.YAML2JSON}}"'
     internal: true
 
+  syft:
+    desc: "  Ensure that syft is installed."
+    run: once
+    requires:
+      vars:
+      - SYFT
+      - OS
+      - ARCH
+    deps:
+    - localbin
+    vars:
+      # renovate: datasource=github-releases depName=syft packageName=anchore/syft
+      SYFT_VERSION: '{{ env "SYFT_VERSION" | default ( .SYFT_VERSION | default "v1.57.2" ) }}'
+      tmpdir:
+        sh: 'mktemp -d -t syft.XXXXXXXX'
+    status:
+    - 'test -x "{{.SYFT}}"'
+    - '"{{.SYFT}}" version | grep -Eq ''^Version: +{{.SYFT_VERSION | trimPrefix "v"}}$'''
+    cmds:
+    - defer: 'rm -rf "{{.tmpdir}}"'
+    - 'curl -fsSL "https://github.com/anchore/syft/releases/download/{{.SYFT_VERSION}}/syft_{{.SYFT_VERSION | trimPrefix "v"}}_{{.OS}}_{{.ARCH}}.tar.gz" --output "{{.tmpdir}}/syft.tar.gz"'
+    - 'tar -xzf "{{.tmpdir}}/syft.tar.gz" --directory "{{.tmpdir}}" syft'
+    - 'chmod +x "{{.tmpdir}}/syft"'
+    - 'mv "{{.tmpdir}}/syft" "{{.SYFT}}"'
+    internal: true
+
   spiff:
     desc: "  Ensure that spiff is installed."
     run: once

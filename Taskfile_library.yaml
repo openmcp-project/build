@@ -71,6 +71,7 @@ vars:
   YAML2JSON: '{{ .YAML2JSON | default (print .LOCALBIN "/yaml2json") }}'
   OCM: '{{ .OCM | default (print .LOCALBIN "/ocm") }}'
   SPIFF: '{{ .SPIFF | default (print .LOCALBIN "/spiff") }}'
+  SYFT: '{{ .SYFT | default (print .LOCALBIN "/syft") }}'
   ENVTEST: '{{ .ENVTEST | default (print .LOCALBIN "/setup-envtest") }}'
 
   # separator strings
