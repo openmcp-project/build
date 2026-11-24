@@ -6,7 +6,7 @@ on:
       app_id:
         description: 'GitHub App ID for creating a GitHub App token'
         required: false
-        default: 1312871 # OpenMCP CI GitHub App
+        default: 1312871 # opencontrolplane-ci GitHub App
         type: string
       github-environment:
         description: 'Optionally define GitHub environment. By default, no GitHub environment is used.'
@@ -40,6 +40,7 @@ jobs:
           submodules: recursive
           ref: ${{ github.ref_name }}
           token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
@@ -55,8 +56,15 @@ jobs:
       - name: Run task generate
         run: task generate --verbose
 
-      - name: Commit generated files
+      - name: Create signed commit for generated files
+        env:
+          BRANCH: ${{ github.ref_name }}
+          COMMIT_HEADLINE: "chore: regenerate after dependency update"
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git diff --quiet || (git add -A && git commit -m "chore: regenerate after dependency update" && git push)
+          git add -A
+          script=.github/scripts/create-signed-commit.sh
+          if [[ -x hack/common/.github/scripts/create-signed-commit.sh ]]; then
+            script=hack/common/.github/scripts/create-signed-commit.sh
+          fi
+          "$script"
