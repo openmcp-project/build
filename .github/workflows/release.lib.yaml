@@ -6,7 +6,7 @@ on:
       app_id:
         description: 'GitHub App ID for creating a GitHub App token'
         required: false
-        default: 1312871 # OpenMCP CI GitHub App
+        default: 1312871 # opencontrolplane-ci GitHub App
         type: string
       is_cli:
         description: 'Indicates if this workflow is for a CLI tool (instead of a controller). If set, the built binaries will be attached to the release as artifacts.'

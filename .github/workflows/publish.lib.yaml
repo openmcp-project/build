@@ -6,7 +6,7 @@ on:
       app_id:
         description: 'GitHub App ID for creating a GitHub App token'
         required: false
-        default: 1312871 # OpenMCP CI GitHub App
+        default: 1312871 # opencontrolplane-ci GitHub App
         type: string
       github-environment:
         description: 'Optionally define GitHub environment. By default, no GitHub environment is used.'
