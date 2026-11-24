@@ -90,11 +90,6 @@ jobs:
           fi
           echo "Tag ${{ env.version }} doesn't exists. Proceeding with release."
 
-      - name: Configure Git for GitHub Actions
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
       - name: Create Git tag
         if: ${{ env.SKIP != 'true' }}
         run: |
@@ -132,8 +127,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
-      - name: Push dev VERSION
+      - name: Create signed dev VERSION commit
         if: ${{ env.SKIP != 'true' }}
+        env:
+          BRANCH: main
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ env.version }}
         run: |
-          task r:prepare-dev-cycle --verbose
-          git push origin main
+          task set-version -- "${VERSION}-dev"
+          git add VERSION go.mod
+          export COMMIT_HEADLINE="chore(release): prepare for next development iteration (version ${VERSION}-dev)"
+          script=.github/scripts/create-signed-commit.sh
+          if [[ -x hack/common/.github/scripts/create-signed-commit.sh ]]; then
+            script=hack/common/.github/scripts/create-signed-commit.sh
+          fi
+          "$script"

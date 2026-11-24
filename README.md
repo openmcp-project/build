@@ -225,7 +225,7 @@ This repository provides reusable GitHub Actions workflows that can be called fr
 
 ### Renovate: Auto-generate after dependency updates
 
-When Renovate updates a dependency (e.g. Go module, tool version), files like CRD manifests or generated code may need to be regenerated. The `renovate-generate.lib.yaml` workflow handles this automatically: it triggers on pushes to `renovate/**` branches, runs `task generate`, and commits any changed files back to the branch.
+When Renovate updates a dependency (e.g. Go module, tool version), files like CRD manifests or generated code may need to be regenerated. The `renovate-generate.lib.yaml` workflow handles this automatically: it triggers on pushes to `renovate/**` branches, runs `task generate`, and creates a GitHub-signed commit for any changed files. The commit is attributed to the `opencontrolplane-ci[bot]` GitHub App.
 
 To use it, add the following workflow to the downstream repository:
 
@@ -247,11 +247,13 @@ jobs:
     secrets: inherit
 ```
 
-Also add the following to the repository's `renovate.json`. This tells Renovate to ignore commits from `github-actions[bot]` when determining whether a branch has been modified externally, which is necessary to keep `:rebaseStalePrs` working correctly:
+The `opencontrolplane-ci` App must be installed on the repository with `contents: write`; it also needs `workflows: write` if generation can change files under `.github/workflows/`.
+
+Also add the following to the repository's `renovate.json`. This tells Renovate to ignore commits from `opencontrolplane-ci[bot]` when determining whether a branch has been modified externally, which is necessary to keep `:rebaseStalePrs` working correctly:
 
 ```json
 "gitIgnoredAuthors": [
-  "github-actions[bot]@users.noreply.github.com"
+  "213051267+opencontrolplane-ci[bot]@users.noreply.github.com"
 ]
 ```
 
