@@ -95,13 +95,14 @@ tasks:
       silent: true
 
   push:
-    desc: "  Push the OCM component to the registry. Existing versions are replaced unless registry policy prevents it."
+    desc: "  Push the OCM component to the registry. It must have been built before. Set OVERWRITE_COMPONENTS to 'true' to overwrite existing component versions."
     run: once
     deps:
     - tools:ocm
     requires:
       vars:
       - VERSION
+      - MODULE_NAME
       - LOCALTMP
     vars:
       COMPONENT_REGISTRY:
@@ -110,7 +111,17 @@ tasks:
     env:
       OCM_SOURCE: 'ctf::{{.compdir}}'
       OCM_TARGET: '{{.COMPONENT_REGISTRY}}'
+      OCM_COMPONENT: '{{lower .MODULE_NAME}}:{{.CD_VERSION | default .VERSION}}'
     cmds:
+    # ocm replaces existing versions and has no flag to prevent it.
+    - |
+      if [[ -n "${OVERWRITE_COMPONENTS:-}" ]] && [[ "${OVERWRITE_COMPONENTS}" != "false" ]]; then
+        exit 0
+      fi
+      if "{{.OCM}}" get cv "$OCM_TARGET//$OCM_COMPONENT"; then
+        echo "$OCM_COMPONENT already exists in $OCM_TARGET. Set OVERWRITE_COMPONENTS to 'true' to overwrite it." >&2
+        exit 1
+      fi
     - '"{{.OCM}}" transfer cv "$OCM_SOURCE" "$OCM_TARGET"'
 
   sign:
