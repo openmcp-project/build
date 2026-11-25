@@ -197,15 +197,15 @@ tasks:
 
 ### OCM Component, SBOMs and Signing
 
-`build:ocm:all` builds, signs, pushes and verifies one OCM component version for the repository. Besides the images, charts and CRDs it contains:
+`build:ocm:all` builds, signs, pushes and verifies one OCM component version for the repository and attests its SBOMs. Besides the images, charts and CRDs it contains:
 - `source`: a `git archive` of the built commit.
 - `<component>-image-sbom-cyclonedx` and `<component>-image-sbom-spdx`: one pair of SBOMs per image and platform, generated with [syft](https://github.com/anchore/syft).
 
-Images reference the digest of the pushed image instead of its tag. Pushing a component version that already exists replaces it, unless the registry forbids it.
+Images reference the digest of the pushed image instead of its tag. `build:ocm:push` refuses to push a component version that already exists, unless `OVERWRITE_COMPONENTS` is set to `true`. The check and the push are separate requests, only tag immutability in the registry rules out a replacement.
 
 Everything is signed keyless with [Sigstore](https://www.sigstore.dev/). There are no signing keys and there is no unsigned mode:
 - `build:img:all` signs each multi-platform image.
-- `build:ocm:build` attests both SBOMs to the platform image they describe.
+- `build:ocm:attest` attests both SBOMs to the platform image they describe. `build:ocm:build` only reads from the registry.
 - `build:ocm:sign` signs the component version.
 
 Each signature is verified right after it is created. Signatures and the signer identity are recorded in the public Sigstore transparency log.
