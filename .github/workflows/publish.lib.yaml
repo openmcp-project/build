@@ -22,7 +22,7 @@ on:
       app_private_key:
         description: 'GitHub App private key for creating a GitHub App token.'
         required: false
-  
+
 permissions:
   packages: write
   id-token: write # keyless signing with the workflow identity
@@ -30,6 +30,10 @@ permissions:
 env:
   OCI_URL: ghcr.io/openmcp-project
 
+# This reusable workflow is deprecated.
+# Use the composable action at ".github/actions/publish" instead.
+# This workflow signs using sigstore with this reusable workflow as the identity, which is not ideal.
+# The composable workflow does the same thing but signs as the calling workflow.
 jobs:
   release_tag:
     name: Release version
