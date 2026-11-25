@@ -46,6 +46,18 @@ configurations:
     certificateOIDCIssuer: $SIGNING_ISSUER
 EOF
 
+    if [[ -z "${CI:-}" ]]; then
+        cat >> "$OCM_CONFIG" <<EOF || die "Cannot write $OCM_CONFIG"
+- type: credentials.config.ocm.software/v1
+  consumers:
+  - identity:
+      type: SigstoreSigner/v1alpha1
+      signature: $SIGNING_NAME
+    credentials:
+    - type: OIDCIdentityTokenProvider/v1alpha1
+EOF
+    fi
+
     # ocm runs the cosign it finds on PATH and downloads its own otherwise.
     PATH="$(dirname "$COSIGN"):$PATH"
 }
