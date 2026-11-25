@@ -1,0 +1,73 @@
+name: Publish
+description: Builds, signs and publishes images, charts and the OCM component. Run it after checking out the repository with submodules.
+
+runs:
+  using: composite
+  steps:
+    - name: Install Task
+      uses: arduino/setup-task@c0bc642852239c2689f73f4ea6459c29405f3c52 # v3.0.0
+      with:
+        version: 3.x
+        repo-token: ${{ github.token }}
+
+    - name: Read and validate VERSION
+      shell: bash
+      run: |
+        VERSION=$(task version)
+        if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-dev(-[0-9a-f]*)?)?$ ]]; then
+          echo "Invalid version format: $VERSION"
+          exit 1
+        fi
+        echo "New version: $VERSION"
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+
+    - name: Set up Docker Context for Buildx
+      shell: bash
+      run: |
+        docker context create builders
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      with:
+        version: latest
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      with:
+        go-version-file: go.mod
+
+    - name: Build and Push Images
+      shell: bash
+      run: |
+        task build:img:all --verbose
+      env:
+        FIPS: 'true'
+        SIGNING_IDENTITY: https://github.com/${{ github.workflow_ref }}
+        SIGNING_ISSUER: https://token.actions.githubusercontent.com
+
+    - name: Verify FIPS compliance
+      shell: bash
+      run: |
+        task build:img:verify-fips --verbose
+
+    - name: Package and Push Helm Charts
+      shell: bash
+      run: |
+        task build:helm:all --verbose
+
+    - name: Build and Push OCM Component
+      shell: bash
+      run: |
+        task build:ocm:all --verbose
+      env:
+        SIGNING_IDENTITY: https://github.com/${{ github.workflow_ref }}
+        SIGNING_ISSUER: https://token.actions.githubusercontent.com

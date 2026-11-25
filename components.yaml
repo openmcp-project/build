@@ -1,12 +1,16 @@
 # TODO: Refactor this.
 #
-# Usage:
-# 
-# Feed arguments into ocm CLI like this:
-#   ocm add componentversions ... -- CHART_REGISTRY=... IMG_REGISTRY=...
+# OCM v2 lacks Spiff support, so Task renders this constructor first.
+#
+# Now - this is NOT nice. DO NOT DO THIS. Just write discrete component constructors and build those.
+# However the build repo is being used by a lot of repositories and the
+# machinery relied on dynamic nature the spiff templating to handle
+# automatically building the constructor. As an interim solution to get
+# to OCM v2 the build repo does the spiff templating manually and then
+# builds with OCM v2.
 #
 # Required values:
-# - VERSION (set via the ocm CLI's --version flag)
+# - VERSION
 #   - Used as version for the source element pointing to this repo.
 #   - Used as referenced GitHub release, if it does not contain a '-dev'.
 #   - Used as fallback value for other versions.
@@ -64,10 +68,20 @@ provider:
   name: openmcp-project
 
 resources:
+# Resources carry content digests; sources do not.
+- name: source
+  type: blob
+  version: (( values.VERSION ))
+  input:
+    type: File/v1
+    path: (( values.SOURCE_ARCHIVE ))
+    mediaType: application/x-tar
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.BP_COMPONENTS))|[]|s,comp|-> s *templates.blueprint] ))
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.CHART_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "chart_version" = (cvs[1] || defaults.CHART_VERSION)) s *templates.chart] ))
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.IMG_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "img_version" = (cvs[1] || defaults.IMG_VERSION)) s *templates.image] ))
 - <<<: (( sum[funcs.splitIgnoreEmpty(",", funcs.ignoreDisabled(defaults.CRDS_COMPONENTS))|[]|s,cv|-> ("cvs" = split(":", cv)) ("comp" = cvs[0], "crds_version" = (cvs[1] || defaults.CRDS_VERSION)) s *templates.crds] ))
+- <<<: (( sum[values.SBOMS || []|[]|s,b|-> ("sbom_format" = "cyclonedx") s *templates.sbom] ))
+- <<<: (( sum[values.SBOMS || []|[]|s,b|-> ("sbom_format" = "spdx") s *templates.sbom] ))
 
 
 # ##########################################################################
@@ -97,15 +111,15 @@ templates:
     name: (( comp "-blueprint" ))
     type: landscaper.gardener.cloud/blueprint
     input:
-      path: (( "../blueprints/" comp ))
-      type: dir
+      path: (( values.CONSTRUCTOR_BASE_DIR "/../blueprints/" comp ))
+      type: Dir/v1
   chart:
     <<<: (( &template ))
     name: (( comp "-chart" ))
     type: helmChart
     version: (( chart_version ))
     access:
-      type: ociArtifact
+      type: OCIImage/v1
       imageReference: (( values.CHART_REGISTRY "/" comp ":" chart_version ))
   image:
     <<<: (( &template ))
@@ -113,16 +127,28 @@ templates:
     type: ociImage
     version: (( img_version ))
     access:
-      imageReference: (( values.IMG_REGISTRY "/" comp ":" img_version ))
-      type: ociArtifact
+      imageReference: (( values.IMAGE_REFERENCES.[values.IMG_REGISTRY "/" comp ":" img_version] || values.IMG_REGISTRY "/" comp ":" img_version ))
+      type: OCIImage/v1
   crds:
     <<<: (( &template ))
     name: (( comp "-crds" ))
     type: fileSystem
     version: (( crds_version ))
     input:
-      type: dir
-      path: (( values.CRDS_PATH ))
+      type: Dir/v1
+      path: (( substr(values.CRDS_PATH, 0, 1) == "/" ? values.CRDS_PATH :values.CONSTRUCTOR_BASE_DIR "/" values.CRDS_PATH ))
+  sbom:
+    <<<: (( &template ))
+    name: (( b.name "-sbom-" sbom_format ))
+    type: sbom
+    version: (( b.version ))
+    extraIdentity:
+      platform: (( b.platform ))
+      image-digest: (( b.digest ))
+    input:
+      type: File/v1
+      path: (( b.directory "/sbom-" sbom_format ".json" ))
+      mediaType: (( sbom_format == "cyclonedx" ? "application/vnd.cyclonedx+json" :"application/spdx+json" ))
 
 
 

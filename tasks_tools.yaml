@@ -149,25 +149,100 @@ tasks:
     - 'chmod +x "{{.YAML2JSON}}"'
     internal: true
 
+  cosign:
+    desc: "  Ensure that cosign is installed."
+    run: once
+    requires:
+      vars:
+      - COSIGN
+      - OS
+      - ARCH
+    deps:
+    - localbin
+    vars:
+      # renovate: datasource=github-releases depName=cosign packageName=sigstore/cosign
+      COSIGN_VERSION: '{{ env "COSIGN_VERSION" | default ( .COSIGN_VERSION | default "v3.1.4" ) }}'
+    status:
+    - 'test -x "{{.COSIGN}}"'
+    - '"{{.COSIGN}}" version 2>&1 | grep -Eq ''^GitVersion: +{{.COSIGN_VERSION}}$'''
+    cmds:
+    - 'curl -fsSL "https://github.com/sigstore/cosign/releases/download/{{.COSIGN_VERSION}}/cosign-{{.OS}}-{{.ARCH}}" --output "{{.COSIGN}}"'
+    - 'chmod +x "{{.COSIGN}}"'
+    internal: true
+
+  syft:
+    desc: "  Ensure that syft is installed."
+    run: once
+    requires:
+      vars:
+      - SYFT
+      - OS
+      - ARCH
+    deps:
+    - localbin
+    vars:
+      # renovate: datasource=github-releases depName=syft packageName=anchore/syft
+      SYFT_VERSION: '{{ env "SYFT_VERSION" | default ( .SYFT_VERSION | default "v1.57.2" ) }}'
+      tmpdir:
+        sh: 'mktemp -d -t syft.XXXXXXXX'
+    status:
+    - 'test -x "{{.SYFT}}"'
+    - '"{{.SYFT}}" version | grep -Eq ''^Version: +{{.SYFT_VERSION | trimPrefix "v"}}$'''
+    cmds:
+    - defer: 'rm -rf "{{.tmpdir}}"'
+    - 'curl -fsSL "https://github.com/anchore/syft/releases/download/{{.SYFT_VERSION}}/syft_{{.SYFT_VERSION | trimPrefix "v"}}_{{.OS}}_{{.ARCH}}.tar.gz" --output "{{.tmpdir}}/syft.tar.gz"'
+    - 'tar -xzf "{{.tmpdir}}/syft.tar.gz" --directory "{{.tmpdir}}" syft'
+    - 'chmod +x "{{.tmpdir}}/syft"'
+    - 'mv "{{.tmpdir}}/syft" "{{.SYFT}}"'
+    internal: true
+
+  spiff:
+    desc: "  Ensure that spiff is installed."
+    run: once
+    requires:
+      vars:
+      - SPIFF
+    deps:
+    - localbin
+    vars:
+      # renovate: datasource=github-releases depName=spiff packageName=mandelsoft/spiff
+      SPIFF_VERSION: '{{ env "SPIFF_VERSION" | default ( .SPIFF_VERSION | default "v1.7.0-beta-10" ) }}'
+    status:
+    - 'test -x "{{.SPIFF}}"'
+    - '"{{.SPIFF}}" --version | grep -Fxq "spiff version {{.SPIFF_VERSION}}"'
+    cmds:
+    - |
+      tmpdir="$(mktemp -d)" || exit 1
+      finish() { rm -rf "$tmpdir"; }
+      trap finish EXIT
+      GOBIN="$tmpdir" go install github.com/mandelsoft/spiff@{{.SPIFF_VERSION}} || exit 1
+      mv "$tmpdir/spiff" "{{.SPIFF}}"
+    internal: true
+
   ocm:
     desc: "  Ensure that the ocm CLI is installed."
     run: once
     requires:
       vars:
       - OCM
+      - OS
+      - ARCH
     deps:
     - localbin
     status:
     - 'test -x "{{.OCM}}"'
-    - '"{{.OCM}}" --version | grep -q "{{.OCM_VERSION | trimPrefix "v"}}"'
+    - '"{{.OCM}}" version | grep -q "OCM CLI (Open Component Model v2)"'
+    - '"{{.OCM}}" version | grep -Fxq "  Version:  {{.OCM_VERSION | trimPrefix "v"}}"'
     vars:
-      # renovate: datasource=github-releases depName=ocm packageName=open-component-model/ocm
-      OCM_VERSION: '{{ env "OCM_VERSION" | default ( .OCM_VERSION | default "v0.55.0" ) }}'
+      # renovate: datasource=github-releases depName=ocm packageName=open-component-model/open-component-model
+      OCM_VERSION: '{{ env "OCM_VERSION" | default ( .OCM_VERSION | default "v0.25.0" ) }}'
       tmpdir:
         sh: 'mktemp -d'
     cmds:
-    - 'curl -sSfL https://ocm.software/install.sh | OCM_VERSION="{{.OCM_VERSION | trimPrefix "v"}}" bash -s "{{.tmpdir}}"'
+    - 'curl -fsSL "https://github.com/open-component-model/open-component-model/releases/download/v{{.OCM_VERSION | trimPrefix "v"}}/ocm-{{.OS}}-{{.ARCH}}" --output "{{.tmpdir}}/ocm"'
+    - 'chmod +x "{{.tmpdir}}/ocm"'
     - 'mv "{{.tmpdir}}/ocm" "{{.OCM}}"'
+    - 'rmdir "{{.tmpdir}}"'
     internal: true
 
   envtest:

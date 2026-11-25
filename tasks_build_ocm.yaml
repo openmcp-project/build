@@ -14,17 +14,24 @@ tasks:
       silent: true
 
   all:
-    desc: "  Builds and pushes the OCM component."
+    desc: "  Builds, signs, pushes and verifies the OCM component and attests its SBOMs."
     run: once
     cmds:
     - task: build
+    - task: sign
+    - task: attest
     - task: push
+    - task: verify
 
   build:
-    desc: "  Build the OCM component."
+    desc: "  Render the constructor template and build the OCM component."
     run: once
+    dir: '{{.ROOT_DIR2}}'
     deps:
     - tools:ocm
+    - tools:spiff
+    - tools:jq
+    - tools:syft
     - tools:localtmp
     requires:
       vars:
@@ -34,31 +41,51 @@ tasks:
       - REPO_URL
     vars:
       CHART_REGISTRY:
-        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --helm'
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" "{{.TASKFILE_DIR2}}/get-registry.sh" --helm'
       IMAGE_REGISTRY:
-        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --image'
-      COMMIT:
-        sh: '( cd "{{.ROOT_DIR2}}"; git rev-parse HEAD )'
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" "{{.TASKFILE_DIR2}}/get-registry.sh" --image'
       compdir: '{{.LOCALTMP}}/component'
+    env:
+      VERSION: '{{.VERSION}}'
+      MODULE_NAME: '{{.MODULE_NAME}}'
+      REPO_URL: '{{.REPO_URL}}'
+      COMMIT: '{{.COMMIT | default ( .GIT_COMMIT | default "" )}}'
+      COMPONENTS: '{{.COMPONENTS | trimSuffix " " | replace " " ","}}'
+      CHART_REGISTRY: '{{.CHART_REGISTRY}}'
+      IMG_REGISTRY: '{{.IMAGE_REGISTRY}}'
+      CD_VERSION: '{{.CD_VERSION | default ""}}'
+      CHART_VERSION: '{{.CHART_VERSION | default ""}}'
+      IMG_VERSION: '{{.IMG_VERSION | default ""}}'
+      BP_PATH: '{{.BP_PATH | default ""}}'
+      BP_COMPONENTS: '{{.BP_COMPONENTS | default ""}}'
+      CHART_COMPONENTS: '{{.CHART_COMPONENTS | default ""}}'
+      IMG_COMPONENTS: '{{.IMG_COMPONENTS | default ""}}'
+      CRDS_COMPONENTS: '{{.CRDS_COMPONENTS | default "[]"}}'
+      CRDS_VERSION: '{{.CRDS_VERSION | default ""}}'
+      CRDS_PATH: '{{.CRDS_PATH | default ""}}'
+      CONSTRUCTOR_BASE_DIR: '{{.TASKFILE_DIR2}}'
+      CONSTRUCTOR_FILE: '{{.LOCALTMP}}/component-constructor.yaml'
+      SOURCE_ARCHIVE: '{{.LOCALTMP}}/source.tar'
+      JQ: '{{.JQ}}'
+      SYFT: '{{.SYFT}}'
+      ROOT_DIR2: '{{.ROOT_DIR2}}'
+      LOCALTMP: '{{.LOCALTMP}}'
+      OCM_COMPONENT_DIR: '{{.compdir}}'
     cmds:
+    - 'git archive --format=tar --output="$SOURCE_ARCHIVE" -- "${COMMIT:-HEAD}"'
+    # Binding files preserve strings containing '=' or leading zeros, unlike spiff -D.
     - |
-      "{{.OCM}}" add componentversions --file "{{.compdir}}" --version "{{.VERSION}}" --create --force --templater spiff "{{.TASKFILE_DIR2}}/components.yaml" -- \
-        VERSION="{{.VERSION}}" \
-        CHART_REGISTRY="{{.CHART_REGISTRY}}" \
-        IMG_REGISTRY="{{.IMAGE_REGISTRY}}" \
-        COMMIT="{{.COMMIT}}" \
-        MODULE_NAME="{{.MODULE_NAME}}" \
-        REPO_URL="{{.REPO_URL}}" \
-        COMPONENTS="{{.COMPONENTS | trimSuffix " " | replace " " ","}}" \
-        CD_VERSION="{{.CD_VERSION | default ""}}" \
-        CHART_VERSION="{{.CHART_VERSION | default ""}}" \
-        IMG_VERSION="{{.IMG_VERSION | default ""}}" \
-        BP_COMPONENTS="{{.BP_COMPONENTS | default ""}}" \
-        CHART_COMPONENTS="{{.CHART_COMPONENTS | default ""}}" \
-        IMG_COMPONENTS="{{.IMG_COMPONENTS | default ""}}" \
-        CRDS_COMPONENTS="{{.CRDS_COMPONENTS | default "[]"}}" \
-        CRDS_VERSION="{{.CRDS_VERSION | default ""}}" \
-        CRDS_PATH="{{.CRDS_PATH | default ""}}"
+      "{{.JQ}}" -n '{values: (env | {
+        VERSION, MODULE_NAME, REPO_URL, COMMIT, COMPONENTS,
+        CHART_REGISTRY, IMG_REGISTRY, CD_VERSION, CHART_VERSION, IMG_VERSION,
+        BP_PATH, BP_COMPONENTS, CHART_COMPONENTS, IMG_COMPONENTS,
+        CRDS_COMPONENTS, CRDS_VERSION, CRDS_PATH, CONSTRUCTOR_BASE_DIR, SOURCE_ARCHIVE
+      })}' > "$LOCALTMP/component-values.json"
+    - '"{{.TASKFILE_DIR2}}/generate-sboms.sh"'
+    - '"{{.SPIFF}}" merge --features control,interpolation --bindings "$LOCALTMP/component-sbom-values.json" "{{.TASKFILE_DIR2}}/components.yaml" > "$CONSTRUCTOR_FILE"'
+    # Transferring the whole archive must not republish versions left by earlier builds.
+    - 'rm -rf -- "$OCM_COMPONENT_DIR"'
+    - '"{{.OCM}}" add cv --constructor "$CONSTRUCTOR_FILE" --repository "ctf::$OCM_COMPONENT_DIR" --working-directory "$ROOT_DIR2" --blob-cache-directory "$LOCALTMP/ocm-cache"'
     - cmd: echo "Use '$(realpath --relative-base="{{.USER_WORKING_DIR}}" "{{.OCM}}") get cv $(realpath --relative-base="{{.USER_WORKING_DIR}}" "{{.compdir}}") -o yaml' to view the generated component descriptor."
       silent: true
 
@@ -70,12 +97,87 @@ tasks:
     requires:
       vars:
       - VERSION
+      - MODULE_NAME
       - LOCALTMP
     vars:
       COMPONENT_REGISTRY:
-        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --component'
-      overwrite_mod:
-        sh: 'if [[ -n ${OVERWRITE_COMPONENTS:-} ]] && [[ ${OVERWRITE_COMPONENTS} != "false" ]]; then echo -n "--overwrite"; fi'
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" "{{.TASKFILE_DIR2}}/get-registry.sh" --component'
       compdir: '{{.LOCALTMP}}/component'
+    env:
+      OCM_SOURCE: 'ctf::{{.compdir}}'
+      OCM_TARGET: '{{.COMPONENT_REGISTRY}}'
+      OCM_COMPONENT: '{{lower .MODULE_NAME}}:{{.CD_VERSION | default .VERSION}}'
     cmds:
-    - '"{{.OCM}}" transfer componentversions "{{.compdir}}" "{{.COMPONENT_REGISTRY}}" {{.overwrite_mod}}'
+    # ocm replaces existing versions and has no flag to prevent it.
+    - |
+      if [[ -n "${OVERWRITE_COMPONENTS:-}" ]] && [[ "${OVERWRITE_COMPONENTS}" != "false" ]]; then
+        exit 0
+      fi
+      if "{{.OCM}}" get cv "$OCM_TARGET//$OCM_COMPONENT"; then
+        echo "$OCM_COMPONENT already exists in $OCM_TARGET. Set OVERWRITE_COMPONENTS to 'true' to overwrite it." >&2
+        exit 1
+      fi
+    - '"{{.OCM}}" transfer cv "$OCM_SOURCE" "$OCM_TARGET"'
+
+  attest:
+    desc: "  Attest the SBOMs to the images they describe. The OCM component must have been built before."
+    run: once
+    deps:
+    - tools:jq
+    - tools:cosign
+    requires:
+      vars:
+      - LOCALTMP
+    env:
+      JQ: '{{.JQ}}'
+      COSIGN: '{{.COSIGN}}'
+      SIGNING_IDENTITY: '{{.SIGNING_IDENTITY}}'
+      SIGNING_ISSUER: '{{.SIGNING_ISSUER}}'
+      LOCALTMP: '{{.LOCALTMP}}'
+    cmds:
+    - '"{{.TASKFILE_DIR2}}/sign.sh" attest "{{.LOCALTMP}}/sboms.jsonl"'
+
+  sign:
+    desc: "  Sign the OCM component in the local archive. It must have been built before."
+    run: once
+    deps:
+    - tools:ocm
+    - tools:cosign
+    requires:
+      vars:
+      - VERSION
+      - MODULE_NAME
+      - LOCALTMP
+    env:
+      OCM: '{{.OCM}}'
+      COSIGN: '{{.COSIGN}}'
+      SIGNING_IDENTITY: '{{.SIGNING_IDENTITY}}'
+      SIGNING_ISSUER: '{{.SIGNING_ISSUER}}'
+      SIGNING_NAME: '{{.SIGNING_NAME}}'
+      LOCALTMP: '{{.LOCALTMP}}'
+    cmds:
+    - '"{{.TASKFILE_DIR2}}/sign.sh" cv "ctf::{{.LOCALTMP}}/component//{{lower .MODULE_NAME}}:{{.CD_VERSION | default .VERSION}}"'
+
+  verify:
+    desc: "  Verify the signature of the OCM component in the registry. It must have been pushed before."
+    run: once
+    deps:
+    - tools:ocm
+    - tools:cosign
+    requires:
+      vars:
+      - VERSION
+      - MODULE_NAME
+      - LOCALTMP
+    vars:
+      COMPONENT_REGISTRY:
+        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" "{{.TASKFILE_DIR2}}/get-registry.sh" --component'
+    env:
+      OCM: '{{.OCM}}'
+      COSIGN: '{{.COSIGN}}'
+      SIGNING_IDENTITY: '{{.SIGNING_IDENTITY}}'
+      SIGNING_ISSUER: '{{.SIGNING_ISSUER}}'
+      SIGNING_NAME: '{{.SIGNING_NAME}}'
+      LOCALTMP: '{{.LOCALTMP}}'
+    cmds:
+    - '"{{.TASKFILE_DIR2}}/sign.sh" verify-cv "{{.COMPONENT_REGISTRY}}//{{lower .MODULE_NAME}}:{{.CD_VERSION | default .VERSION}}"'
