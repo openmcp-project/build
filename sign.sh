@@ -10,13 +10,17 @@
 #   SIGNING_IDENTITY    certificate identity the signatures must carry
 #   SIGNING_ISSUER      OIDC issuer of that identity
 #   SIGNING_NAME        component version signature name, cv and verify-cv only
-#   LOCALTMP            receives the OCM signing configuration, cv and verify-cv only
+#   LOCALTMP            receives the OCM signing configuration and the attestation list
+#   JQ                  tool binary, attest only
 #
 # Subcommands:
-#   image <reference>             sign the image the reference resolves to
-#   attest <image> <directory>    attach the SBOMs in the directory to the image
-#   cv <reference>                sign a component version
-#   verify-cv <reference>         verify the signature of a component version
+#   image <reference>        sign the image the reference resolves to
+#   attest <records>         attach the SBOMs recorded by generate-sboms.sh to their images
+#   cv <reference>           sign a component version
+#   verify-cv <reference>    verify the signature of a component version
+
+# jq variables must not be expanded by the shell.
+# shellcheck disable=SC2016
 
 log() { echo ">>> $*"; }
 die() { echo "$@" >&2; exit 1; }
@@ -74,10 +78,34 @@ _image() {
     "$COSIGN" verify "${signer[@]}" "$image" > /dev/null || die "Signature of $image does not verify"
 }
 
+# platform image and SBOM directory of every SBOM record
+#
+# Input, other fields omitted:
+#   {
+#    "pinned": "ghcr.io/org/images/app@sha256:<index>",
+#    "digest": "sha256:<platform>",
+#    "directory": "tmp/sbom/app/v1.0.0/<platform>",
+#   }
+# Output, tab separated:
+#   ghcr.io/org/images/app@sha256:<platform>    tmp/sbom/app/v1.0.0/<platform>
+attestations_filter='
+    (.pinned | split("@") | first) as $repository
+    | ["\($repository)@\(.digest)", .directory]
+    | @tsv
+'
+
 _attest() {
-    log "Attesting SBOMs of $1"
-    attest_sbom "$1" cyclonedx "$2/sbom-cyclonedx.json"
-    attest_sbom "$1" spdxjson "$2/sbom-spdx.json"
+    local image directory
+
+    [[ -n "${JQ:-}" && -n "${LOCALTMP:-}" ]] || die "JQ and LOCALTMP must be set"
+
+    "$JQ" -r "$attestations_filter" "$1" > "$LOCALTMP/attestations.tsv" || die "Cannot read SBOM records from $1"
+
+    while IFS=$'\t' read -r image directory; do
+        log "Attesting SBOMs of $image"
+        attest_sbom "$image" cyclonedx "$directory/sbom-cyclonedx.json"
+        attest_sbom "$image" spdxjson "$directory/sbom-spdx.json"
+    done < "$LOCALTMP/attestations.tsv"
 }
 
 _cv() {

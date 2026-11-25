@@ -204,7 +204,7 @@ tasks:
 Images reference the digest of the pushed image instead of its tag. `build:ocm:push` refuses to push a component version that already exists, unless `OVERWRITE_COMPONENTS` is set to `true`. The check and the push are separate requests, only tag immutability in the registry rules out a replacement.
 
 Everything is signed keyless with [Sigstore](https://www.sigstore.dev/). There are no signing keys and there is no unsigned mode:
-- `build:img:all` signs each multi-platform image.
+- `build:img:push-multi` signs each multi-platform image it pushes.
 - `build:ocm:attest` attests both SBOMs to the platform image they describe. `build:ocm:build` only reads from the registry.
 - `build:ocm:sign` signs the component version.
 

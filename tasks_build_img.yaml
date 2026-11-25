@@ -186,7 +186,7 @@ tasks:
     internal: true
 
   push-multi:
-    desc: "  Push the multi-platform image. Images must have been built before."
+    desc: "  Push and sign the multi-platform image. Images must have been built before."
     vars:
       IMAGE_BASE:
         sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --image'
@@ -213,11 +213,17 @@ tasks:
       task: push-multi-internal
 
   push-multi-internal:
-    desc: "  Build and push the multi-platform manifest for a single component's image. Individual platform-specific images must have been pushed before."
+    desc: "  Build, push and sign the multi-platform manifest for a single component's image. Individual platform-specific images must have been pushed before."
+    deps:
+    - tools:cosign
     requires:
       vars:
       - IMG
       - ALL_ARCH
+    env:
+      COSIGN: '{{.COSIGN}}'
+      SIGNING_IDENTITY: '{{.SIGNING_IDENTITY}}'
+      SIGNING_ISSUER: '{{.SIGNING_ISSUER}}'
     cmds:
     - for:
         matrix:
@@ -227,6 +233,7 @@ tasks:
       cmd: 'docker manifest create {{.IMG}} --amend {{.IMG}}-{{.ITEM.OS}}-{{.ITEM.ARCH}}'
     - 'echo "Pushing image {{.IMG}}"'
     - 'docker manifest push {{.IMG}}'
+    - '"{{.TASKFILE_DIR2}}/sign.sh" image "{{.IMG}}"'
     internal: true
 
   verify-fips:
@@ -405,30 +412,8 @@ tasks:
         as: COMPONENT
       cmd: 'docker buildx imagetools create "{{.IMAGE_BASE}}/{{.COMPONENT}}:{{.VERSION}}" --tag "{{.IMAGE_BASE}}/{{.COMPONENT}}:{{.TAG}}"'
 
-  sign-multi:
-    desc: "  Sign the multi-platform images. Images must have been pushed before."
-    deps:
-    - tools:cosign
-    vars:
-      IMAGE_BASE:
-        sh: 'PROJECT_ROOT="{{.ROOT_DIR2}}" {{.TASKFILE_DIR2}}/get-registry.sh --image'
-    requires:
-      vars:
-      - COMPONENTS
-      - VERSION
-    env:
-      COSIGN: '{{.COSIGN}}'
-      SIGNING_IDENTITY: '{{.SIGNING_IDENTITY}}'
-      SIGNING_ISSUER: '{{.SIGNING_ISSUER}}'
-    cmds:
-    - for:
-        var: COMPONENTS
-        as: COMPONENT
-      cmd: '"{{.TASKFILE_DIR2}}/sign.sh" image "{{.IMAGE_BASE}}/{{.COMPONENT}}:{{.VERSION}}"'
-
   all:
     desc: "  Build FIPS-compliant binaries and images for multiple operating systems and architectures, push them to the registry and sign them."
     cmds:
     - task: build-multi
     - task: push-multi
-    - task: sign-multi

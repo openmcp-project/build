@@ -14,11 +14,12 @@ tasks:
       silent: true
 
   all:
-    desc: "  Builds, signs, pushes and verifies the OCM component."
+    desc: "  Builds, signs, pushes and verifies the OCM component and attests its SBOMs."
     run: once
     cmds:
     - task: build
     - task: sign
+    - task: attest
     - task: push
     - task: verify
 
@@ -31,7 +32,6 @@ tasks:
     - tools:spiff
     - tools:jq
     - tools:syft
-    - tools:cosign
     - tools:localtmp
     requires:
       vars:
@@ -68,9 +68,6 @@ tasks:
       SOURCE_ARCHIVE: '{{.LOCALTMP}}/source.tar'
       JQ: '{{.JQ}}'
       SYFT: '{{.SYFT}}'
-      COSIGN: '{{.COSIGN}}'
-      SIGNING_IDENTITY: '{{.SIGNING_IDENTITY}}'
-      SIGNING_ISSUER: '{{.SIGNING_ISSUER}}'
       ROOT_DIR2: '{{.ROOT_DIR2}}'
       LOCALTMP: '{{.LOCALTMP}}'
       OCM_COMPONENT_DIR: '{{.compdir}}'
@@ -84,8 +81,6 @@ tasks:
         BP_PATH, BP_COMPONENTS, CHART_COMPONENTS, IMG_COMPONENTS,
         CRDS_COMPONENTS, CRDS_VERSION, CRDS_PATH, CONSTRUCTOR_BASE_DIR, SOURCE_ARCHIVE
       })}' > "$LOCALTMP/component-values.json"
-    - '"{{.SPIFF}}" merge --features control,interpolation --bindings "$LOCALTMP/component-values.json" "{{.TASKFILE_DIR2}}/components.yaml" > "$CONSTRUCTOR_FILE"'
-    - '"{{.SPIFF}}" convert --json --path resources "$CONSTRUCTOR_FILE" > "$LOCALTMP/component-resources.json"'
     - '"{{.TASKFILE_DIR2}}/generate-sboms.sh"'
     - '"{{.SPIFF}}" merge --features control,interpolation --bindings "$LOCALTMP/component-sbom-values.json" "{{.TASKFILE_DIR2}}/components.yaml" > "$CONSTRUCTOR_FILE"'
     # Transferring the whole archive must not republish versions left by earlier builds.
@@ -123,6 +118,24 @@ tasks:
         exit 1
       fi
     - '"{{.OCM}}" transfer cv "$OCM_SOURCE" "$OCM_TARGET"'
+
+  attest:
+    desc: "  Attest the SBOMs to the images they describe. The OCM component must have been built before."
+    run: once
+    deps:
+    - tools:jq
+    - tools:cosign
+    requires:
+      vars:
+      - LOCALTMP
+    env:
+      JQ: '{{.JQ}}'
+      COSIGN: '{{.COSIGN}}'
+      SIGNING_IDENTITY: '{{.SIGNING_IDENTITY}}'
+      SIGNING_ISSUER: '{{.SIGNING_ISSUER}}'
+      LOCALTMP: '{{.LOCALTMP}}'
+    cmds:
+    - '"{{.TASKFILE_DIR2}}/sign.sh" attest "{{.LOCALTMP}}/sboms.jsonl"'
 
   sign:
     desc: "  Sign the OCM component in the local archive. It must have been built before."

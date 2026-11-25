@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 
-# Generates CycloneDX and SPDX SBOMs for every platform of every image in the component
-# and attests them to the scanned image.
+# Generates CycloneDX and SPDX SBOMs for every platform of every image in the component.
 #
 # Environment:
-#   JQ, SYFT    tool binaries
-#   sign.sh environment for the attestations
-#   LOCALTMP    holds component-resources.json and component-values.json,
-#               receives sbom/, sboms.jsonl and component-sbom-values.json
+#   JQ, SYFT                      tool binaries
+#   IMG_COMPONENTS, COMPONENTS    image selection, e.g. app:v1.0.0,worker; [] selects none
+#   IMG_VERSION, VERSION          version of images selected without one
+#   IMG_REGISTRY                  registry path the images are pushed to
+#   LOCALTMP                      holds component-values.json,
+#                                 receives sbom/, sboms.jsonl and component-sbom-values.json
 
 # jq variables must not be expanded by the shell.
 # shellcheck disable=SC2016
@@ -17,14 +18,9 @@ die() { echo "$@" >&2; exit 1; }
 
 digest_pattern='^sha256:[a-f0-9]{64}$'
 platform_pattern='^[a-z0-9]+/[a-z0-9]+(/[a-zA-Z0-9._-]+)?$'
-
-# name, version and reference of every image resource
-images_filter='
-    .[]
-    | select(.type == "ociImage")
-    | [.name, .version, .access.imageReference]
-    | @tsv
-'
+component_pattern='^[a-z0-9][a-z0-9._-]*$'
+# OCI tag grammar
+version_pattern='^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$'
 
 # digest and os/architecture[/variant] of a platform record
 platform_columns='
@@ -51,6 +47,30 @@ sbom_bindings='
     .values.SBOMS = $sboms
     | .values.IMAGE_REFERENCES = ($sboms | map({key: .reference, value: .pinned}) | from_entries)
 '
+
+# images — print name, version and reference of every selected image.
+images() {
+    local components="${IMG_COMPONENTS:-${COMPONENTS:-}}"
+    local default_version="${IMG_VERSION:-${VERSION:-}}"
+    local -a entries
+    local entry component version
+
+    [[ "$components" != "[]" ]] || return 0
+
+    IFS=, read -ra entries <<< "$components"
+    for entry in "${entries[@]}"; do
+        [[ -n "$entry" ]] || continue
+
+        component="${entry%%:*}"
+        version="$default_version"
+        [[ "$entry" != *:* ]] || version="${entry#*:}"
+
+        [[ "$component" =~ $component_pattern ]] || die "Invalid image component: $component"
+        [[ "$version" =~ $version_pattern ]] || die "Invalid image version: $version"
+
+        echo "$component-image"$'\t'"$version"$'\t'"$IMG_REGISTRY/$component:$version"
+    done
+}
 
 # inspect <reference> <docker format flags>… — print registry metadata of an image.
 inspect() {
@@ -133,19 +153,18 @@ image_sboms() {
 
         log "Scanning $repo@$child ($platform)"
         scan "$repo" "$child" "$platform" "$directory" || die "Cannot scan $repo@$child"
-        "$(dirname "$0")/sign.sh" attest "$repo@$child" "$directory" || exit 1
         record "$name" "$version" "$reference" "$pinned" "$child" "$platform" "$directory" >> "$records" ||
             die "Cannot record SBOMs of $repo@$child"
     done < "$LOCALTMP/platforms.tsv"
 }
 
-[[ -n "${JQ:-}" && -n "${SYFT:-}" && -n "${LOCALTMP:-}" ]] || die "JQ, SYFT and LOCALTMP must be set"
+[[ -n "${JQ:-}" && -n "${SYFT:-}" && -n "${LOCALTMP:-}" && -n "${IMG_REGISTRY:-}" ]] ||
+    die "JQ, SYFT, LOCALTMP and IMG_REGISTRY must be set"
 
-resources="$LOCALTMP/component-resources.json"
 values="$LOCALTMP/component-values.json"
 records="$LOCALTMP/sboms.jsonl"
 
-"$JQ" -r "$images_filter" "$resources" > "$LOCALTMP/images.tsv" || die "Cannot read images from $resources"
+images > "$LOCALTMP/images.tsv" || die "Cannot write $LOCALTMP/images.tsv"
 : > "$records" || die "Cannot write $records"
 
 while IFS=$'\t' read -r name version reference; do
