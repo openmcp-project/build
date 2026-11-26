@@ -39,7 +39,7 @@ jobs:
         with:
           # required
           app-id: ${{ inputs.app_id }}
-          private-key: ${{ case( secrets.app_private_key != '', secrets.app_private_key, secrets.OPENMCP_CI_APP_PRIVATE_KEY ) }}
+          private-key: ${{ case( secrets.app_private_key != '', secrets.app_private_key, secrets.OPENCONTROLPLANE_CI_PEM_FILE ) }}
 
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
