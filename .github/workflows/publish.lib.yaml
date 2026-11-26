@@ -9,9 +9,9 @@ on:
         default: 1312871 # opencontrolplane-ci GitHub App
         type: string
       github-environment:
-        description: 'Optionally define GitHub environment. By default, no GitHub environment is used.'
+        description: 'Optionally define GitHub environment. By default the `default` GitHub environment is used.'
         required: false
-        default: ""
+        default: "release"
         type: string
       fips:
         description: 'Whether to build FIPS-compliant images. When false, standard (non-FIPS) images are built and FIPS verification is skipped.'
@@ -46,7 +46,7 @@ jobs:
         with:
           # required
           app-id: ${{ inputs.app_id }}
-          private-key: ${{ case( secrets.app_private_key != '', secrets.app_private_key, secrets.OPENMCP_CI_APP_PRIVATE_KEY ) }}
+          private-key: ${{ case( secrets.app_private_key != '', secrets.app_private_key, secrets.OPENCONTROLPLANE_CI_PEM_FILE ) }}
 
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
