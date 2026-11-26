@@ -14,9 +14,9 @@ on:
         default: false
         type: boolean
       github-environment:
-        description: 'Optionally define GitHub environment. By default, no GitHub environment is used.'
+        description: 'Optionally define GitHub environment. By default the `release` GitHub environment is used.'
         required: false
-        default: ""
+        default: "release"
         type: string
     secrets:
       app_private_key:
@@ -105,11 +105,11 @@ jobs:
 
       - name: Generate release artifacts
         if: ${{ ( env.SKIP != 'true' ) && inputs.is_cli }}
-        run: task r:artifacts --verbose  
+        run: task r:artifacts --verbose
 
       - name: Build Changelog
         if: ${{ env.SKIP != 'true' }}
-        id: github_release  
+        id: github_release
         run: task r:generate-changelog
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
