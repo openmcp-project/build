@@ -126,7 +126,7 @@ jobs:
           body_path: ./CHANGELOG.md
           generate_release_notes: true
           prerelease: false
-          files: ${{ fromJSON('["", "./bin/release/*"]')[inputs.is_cli] }}
+          files: ${{ case(inputs.is_cli, './bin/release/*', '') }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
@@ -137,7 +137,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           VERSION: ${{ env.version }}
         run: |
-          task set-version -- "${VERSION}-dev"
+          task release:set-version -- "${VERSION}-dev"
           git add VERSION go.mod
           export COMMIT_HEADLINE="chore(release): prepare for next development iteration (version ${VERSION}-dev)"
           script=.github/scripts/create-signed-commit.sh
