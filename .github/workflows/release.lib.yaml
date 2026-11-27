@@ -92,6 +92,9 @@ jobs:
 
       - name: Create Git tag
         if: ${{ env.SKIP != 'true' }}
+        env:
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
         run: |
           git tag -a "${{ env.version }}" -m "Release ${{ env.version }}"
           git push origin "${{ env.version }}"
