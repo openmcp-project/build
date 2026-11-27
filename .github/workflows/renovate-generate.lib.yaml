@@ -11,7 +11,7 @@ on:
       github-environment:
         description: 'Optionally define GitHub environment. By default, no GitHub environment is used.'
         required: false
-        default: ""
+        default: "release"
         type: string
     secrets:
       app_private_key:
